@@ -1,5 +1,38 @@
 
-	$Id: README,v 1.1 2011-02-20 07:33:50 gillham Exp $
+SUMP compatible logic analyzer for Arduino
+==========================================
 
-This README is just a placeholder for now.
+This Arduino sketch implements a SUMP protocol compatible with the standard
+SUMP client as well as the alternative client from here:
+	http://www.lxtreme.nl/ols/
+
+This SUMP protocol compatible logic analyzer for the Arduino board supports
+5 channels consisting of digital pins 8-12, which are the first 5 bits (0-4)
+of PORTB. Arduino pin 13 / bit 5 is the Arduino LED, bits 6 & 7 are the
+crystal oscillator pins.
+Uncomment CHAN5 below if you want to use the LED pin as an input and have
+6 channels.
+
+NOTE:
+You must DISABLE the Arudion auto reset feature to use this logic analyzer
+code. There are various methods to do this, some boards have a jumper,
+others require you to cut a trace.  You may also install a *precisely*
+120 Ohm resistor between the reset & 5V piins.  Make sure it is really
+120 Ohm or you may damage your board.
+
+To use this with the original or alternative SUMP clients,
+use these settings:
+
+Sampling rate: 1MHz (or lower)
+Channel Groups: 0 (zero) only
+Recording Size: 512 (or lower)
+Noise Filter: doesn't matter
+RLE: disabled (unchecked)
+
+Triggering is still a work in progress, but generally works for samples
+below 1MHz.  1MHz works for a basic busy wait trigger that doesn't store
+until after the trigger fires.
+Please try it out and report back.
+
+Release: v0.01 February 19, 2011.
 
