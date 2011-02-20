@@ -1,4 +1,3 @@
-
 SUMP compatible logic analyzer for Arduino
 ==========================================
 
@@ -14,7 +13,7 @@ Uncomment CHAN5 below if you want to use the LED pin as an input and have
 6 channels.
 
 NOTE:
-You must DISABLE the Arudion auto reset feature to use this logic analyzer
+You must DISABLE the Arduino auto reset feature to use this logic analyzer
 code. There are various methods to do this, some boards have a jumper,
 others require you to cut a trace.  You may also install a *precisely*
 120 Ohm resistor between the reset & 5V piins.  Make sure it is really
