@@ -24,7 +24,7 @@ use these settings:
 
 Sampling rate: 1MHz (or lower)
 Channel Groups: 0 (zero) only
-Recording Size: 512 (or lower)
+Recording Size: 1024 (or lower)
 Noise Filter: doesn't matter
 RLE: disabled (unchecked)
 
