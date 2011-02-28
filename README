@@ -33,5 +33,5 @@ below 1MHz.  1MHz works for a basic busy wait trigger that doesn't store
 until after the trigger fires.
 Please try it out and report back.
 
-Release: v0.01 February 19, 2011.
+Release: v0.02 February 28, 2011.
 
