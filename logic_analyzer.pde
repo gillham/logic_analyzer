@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: logic_analyzer.pde,v 1.8 2011-02-20 06:54:16 gillham Exp $
+ *	$Id: logic_analyzer.pde,v 1.11 2011-02-28 22:04:37 gillham Exp $
  *
  */
  
@@ -38,7 +38,7 @@
  * 6 channels.
  *
  * NOTE:
- * You must DISABLE the Arudion auto reset feature to use this logic analyzer
+ * You must DISABLE the Arduino auto reset feature to use this logic analyzer
  * code. There are various methods to do this, some boards have a jumper,
  * others require you to cut a trace.  You may also install a *precisely*
  * 120 Ohm resistor between the reset & 5V piins.  Make sure it is really
@@ -49,7 +49,7 @@
  * 
  * Sampling rate: 1MHz (or lower)
  * Channel Groups: 0 (zero) only
- * Recording Size: 512 (or lower)
+ * Recording Size: 1024 (or lower)
  * Noise Filter: doesn't matter
  * RLE: disabled (unchecked)
  *
@@ -58,7 +58,7 @@
  * until after the trigger fires.
  * Please try it out and report back.
  *
- * Release: v0.01 February 19, 2011.
+ * Release: v0.02 February 28, 2011.
  *
  */
 
@@ -109,15 +109,14 @@ void debugdump(void);
 #define SUMP_GET_METADATA 0x04
 
 /*
- * trying to have 1024 bytes free for logicdata by turning things off.
- * almost works at 908 bytes, but need 1024 for the client.
- * 1024 doesn't work, so still set to 512 for both cases.
+ * Capture size of 1024 bytes works on the ATmega328.
+ *
  */
 #define DEBUG
 #ifdef DEBUG
-#define MAX_CAPTURE_SIZE 512
+#define MAX_CAPTURE_SIZE 1024
 #else
-#define MAX_CAPTURE_SIZE 512
+#define MAX_CAPTURE_SIZE 1024
 #endif /* DEBUG */
 
 /*
@@ -125,16 +124,16 @@ void debugdump(void);
  * SUMP commands are either 1 byte, or for the extended commands, 5 bytes.
  */
 int cmdByte = 0;
-int cmdBytes[5];
+byte cmdBytes[5];
 
 #ifdef DEBUG
-int savebytes[128];
+byte savebytes[128];
 int savecount = 0;
 #endif /* DEBUG */
 
-int logicdata[MAX_CAPTURE_SIZE];
+byte logicdata[MAX_CAPTURE_SIZE];
 /* 908 works initially but then wedges.  probably runs out of stack. */
-/* int logicdata[908]; */
+/* byte logicdata[908]; */
 unsigned int logicIndex = 0;
 unsigned int triggerIndex = 0;
 unsigned int readCount = MAX_CAPTURE_SIZE;
@@ -419,6 +418,7 @@ void captureMicro() {
     for (i = 0 ; i < readCount; i++) {
       logicdata[i] = PINB;
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+      __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
     }
     PORTD = B00000000; /* debug timing measurement */
   } 
@@ -430,7 +430,8 @@ void captureMicro() {
     PORTD = B10000000; /* debug timing measurement */
     for (i = 0 ; i < readCount; i++) {
       logicdata[i] = PINB;
-      __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+      __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+      __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
@@ -449,7 +450,7 @@ void captureMicro() {
     for (i = 0 ; i < readCount; i++) {
       logicdata[i] = PINB;
       delayMicroseconds(delayTime - 1);
-      __asm__("nop\n\t");
+      __asm__("nop\n\t""nop\n\t");
     }
     PORTD = B00000000; /* debug timing measurement */
   }
@@ -612,6 +613,7 @@ void triggerMicro() {
       logicdata[logicIndex++] = PINB;
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+      __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
     }
     PORTD = B00000000; /* debug timing measurement */
     delayMicroseconds(100);
@@ -646,7 +648,7 @@ void triggerMicro() {
      * This needs adjustment so that we have the right spacing between the
      * before trigger samples and the after trigger samples.
      */
-    delayMicroseconds(delayTime - 3);
+    delayMicroseconds(delayTime);
 
     /* keep sampling for delayCount after trigger */
     PORTD = B10000000; /* debug timing measurement */
@@ -656,8 +658,9 @@ void triggerMicro() {
       }
       logicdata[logicIndex++] = PINB;
       delayMicroseconds(delayTime - 3);
-      __asm__("nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+      __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+      __asm__("nop\n\t""nop\n\t""nop\n\t");
     }
     PORTD = B00000000; /* debug timing measurement */
     delayMicroseconds(100);
@@ -725,11 +728,11 @@ void get_metadata() {
   Serial.print('0', BYTE);
   Serial.print(0x00, BYTE);
 
-  /* sample memory (512) */
+  /* sample memory (1024) */
   Serial.print(0x21, BYTE);
   Serial.print(0x00, BYTE);
   Serial.print(0x00, BYTE);
-  Serial.print(0x02, BYTE);
+  Serial.print(0x04, BYTE);
   Serial.print(0x00, BYTE);
 
   /* sample rate (1MHz) */
