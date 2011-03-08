@@ -25,10 +25,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: logic_analyzer.pde,v 1.11 2011-02-28 22:04:37 gillham Exp $
+ *	$Id: logic_analyzer.pde,v 1.14 2011-03-08 07:14:42 gillham Exp $
  *
  */
- 
+
 /*
  * This SUMP protocol compatible logic analyzer for the Arduino board supports
  * 5 channels consisting of digital pins 8-12, which are the first 5 bits (0-4)
@@ -78,7 +78,10 @@ void get_metadata(void);
 void debugprint(void);
 void debugdump(void);
 
-/* uncomment CHAN5 to use it as an additional input. */
+/*
+ * Uncomment CHAN5 to use it as an additional input.
+ * You'll need to change the number of channels in the device profile as well.
+ */
 #define CHAN0 8
 #define CHAN1 9
 #define CHAN2 10
@@ -132,12 +135,9 @@ int savecount = 0;
 #endif /* DEBUG */
 
 byte logicdata[MAX_CAPTURE_SIZE];
-/* 908 works initially but then wedges.  probably runs out of stack. */
-/* byte logicdata[908]; */
 unsigned int logicIndex = 0;
 unsigned int triggerIndex = 0;
 unsigned int readCount = MAX_CAPTURE_SIZE;
-unsigned int bufferWrapped = 0;
 unsigned int delayCount = 0;
 unsigned int trigger = 0;
 unsigned int trigger_values = 0;
@@ -360,12 +360,12 @@ void getCmd() {
 /*
  * This function samples data using a microsecond delay function.
  * It also has rudimentary trigger support where it will just sit in
- * a busy loop waiting for the trigger condition to occur.
+ * a busy loop waiting for the trigger conditions to occur.
  *
  * This loop is not clocked to the sample rate in any way, it just
  * reads the port as fast as possible waiting for a trigger match.
  * Multiple channels can have triggers enabled and can have different
- * trigger values.  The first match fires the trigger as expected.
+ * trigger values.  All conditions must match to trigger.
  *
  * After the trigger fires (if it is enabled) the pins are sampled
  * at the appropriate rate.
@@ -376,13 +376,11 @@ void captureMicro() {
   int i;
 
   /*
-   * very basic trigger, wait until any pin changes on port B.
-   * this should only allow enabled channels to trigger, but it
-   * might catch non-input pins changing, but we'll live with it for now.
+   * basic trigger, wait until all trigger conditions are met on port B.
    * this needs further testing, but basic tests work as expected.
    */
   if (trigger) {
-    while (!(trigger & ~(trigger_values ^ PINB)));
+    while ((trigger_values ^ PINB) & trigger);
   }
 
   /*
@@ -441,8 +439,8 @@ void captureMicro() {
   } 
   else {
     /*
-     * not 1MHz or 500KHz; delayMicroseconds( delay - 1) works fine here
-     * with one nop of padding. (based on measure debug pin toggles with
+     * not 1MHz or 500KHz; delayMicroseconds(delay - 1) works fine here
+     * with two NOPs of padding. (based on measured debug pin toggles with
      * a better logic analyzer)
      * start of real measurement
      */
@@ -474,9 +472,9 @@ void captureMicro() {
  * This is only used for sample rates < 100Hz.
  *
  * The basic triggering in this function will be replaced by a 'triggerMillis'
- * function shortly that uses the circular trigger buffer.
+ * function eventually that uses the circular trigger buffer.
  *
- * Since we're using delay() and 20ms/50ms/100ms sample rates we're at all
+ * Since we're using delay() and 20ms/50ms/100ms sample rates we're not
  * worried that the sample loops take a few microseconds more than we're
  * supposed to.
  * We could measure the sample loop and use delay(delayTime - 1), then
@@ -491,7 +489,7 @@ void captureMilli() {
    * very basic trigger, just like in captureMicros() above.
    */
   if (trigger) {
-    while (!(trigger & ~(trigger_values ^ PINB)));
+    while ((trigger_values ^ PINB) & trigger);
   }
 
   for (i = 0 ; i < readCount; i++) {
@@ -506,20 +504,16 @@ void captureMilli() {
 /*
  * This function provides sampling with triggering and a circular trigger
  * buffer.
- * This works ok 500KHz and lower sample rates.  We don't have enough time
+ * This works ok at 500KHz and lower sample rates.  We don't have enough time
  * with a 16MHz clock to sample at 1MHz into the circular buffer.  A 20MHz
  * clock might be ok but all of the timings would have to be redone.
  * 
  */
 void triggerMicro() {
   int i = 0;
-  int localDelay = 0;
-  unsigned int j = 0;
-  unsigned int k = 0;
 
   logicIndex = 0;
   triggerIndex = 0;
-  bufferWrapped = 0;
 
   /*
    * disable interrupts during capture to maintain precision.
@@ -568,7 +562,7 @@ void triggerMicro() {
      * and use it as a circular buffer
      */
     PORTD = B10000000; /* debug timing measurement */
-    while (!(trigger & ~(trigger_values ^ (logicdata[logicIndex] = PINB)))) {
+    while ((trigger_values ^ (logicdata[logicIndex] = PINB)) & trigger) {
       /* PORTD = B00000000; */
       /* increment index. */
       logicIndex++;
@@ -629,13 +623,12 @@ void triggerMicro() {
      *
      */
     PORTD = B10000000; /* debug timing measurement */
-    while (!(trigger & ~(trigger_values ^ (logicdata[logicIndex] = PINB)))) {
+    while ((trigger_values ^ (logicdata[logicIndex] = PINB)) & trigger) {
       /* PORTD = B00000000; */
       /* increment index. */
       logicIndex++;
       if (logicIndex >= readCount) {
         logicIndex = 0;
-        bufferWrapped = 1;
       }
       /* PORTD = B10000000; */
     }
@@ -783,8 +776,6 @@ void debugprint() {
   Serial.println(logicIndex, DEC);
   Serial.print("triggerIndex = ");
   Serial.println(triggerIndex, DEC);
-  Serial.print("bufferWrapped = ");
-  Serial.println(bufferWrapped, DEC);
 
   Serial.println("Bytes:");
 
@@ -821,4 +812,5 @@ void debugdump() {
   }
 }
 #endif /* DEBUG */
+
 
