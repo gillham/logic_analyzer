@@ -25,11 +25,15 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: logic_analyzer.pde,v 1.14 2011-03-08 07:14:42 gillham Exp $
+ *	$Id: logic_analyzer.pde,v 1.17 2011-08-04 02:31:01 gillham Exp $
  *
  */
 
 /*
+ * This Arduino sketch implements a SUMP protocol compatible with the standard
+ * SUMP client as well as the alternative client from here:
+ *	http://www.lxtreme.nl/ols/
+ *
  * This SUMP protocol compatible logic analyzer for the Arduino board supports
  * 5 channels consisting of digital pins 8-12, which are the first 5 bits (0-4)
  * of PORTB. Arduino pin 13 / bit 5 is the Arduino LED, bits 6 & 7 are the
@@ -37,19 +41,32 @@
  * Uncomment CHAN5 below if you want to use the LED pin as an input and have
  * 6 channels.
  *
+ * On the Arduino Mega board 8 channels are supported and 7k of samples.
+ * Pins 22-29 (Port A) are used by default, you can change the 'CHANPIN' below
+ * if something else works better for you.
+ *
  * NOTE:
+ * If you are using the original SUMP client, or using the alternative client
+ * without the device profiles, then you will get a "device not found" error.
  * You must DISABLE the Arduino auto reset feature to use this logic analyzer
  * code. There are various methods to do this, some boards have a jumper,
  * others require you to cut a trace.  You may also install a *precisely*
  * 120 Ohm resistor between the reset & 5V piins.  Make sure it is really
  * 120 Ohm or you may damage your board.
+ * It is much easier to use the alternative SUMP client from here:
+ *      http://www.lxtreme.nl/ols/
+ *
+ * The device profiles should be included with this code.  Copy them to the
+ * 'plugins' directory of the client.  The location varies depending on the
+ * platform, but on the mac it is here by default:
+ * /Applications/LogicSniffer.app/Contents/Resources/Java/plugins
  *
  * To use this with the original or alternative SUMP clients,
  * use these settings:
  * 
  * Sampling rate: 1MHz (or lower)
  * Channel Groups: 0 (zero) only
- * Recording Size: 1024 (or lower)
+ * Recording Size: 1024 (or lower), 7168 (or lower) for the Arduino Mega
  * Noise Filter: doesn't matter
  * RLE: disabled (unchecked)
  *
@@ -58,7 +75,7 @@
  * until after the trigger fires.
  * Please try it out and report back.
  *
- * Release: v0.02 February 28, 2011.
+ * Release: v0.04 August 3, 2011.
  *
  */
 
@@ -79,15 +96,31 @@ void debugprint(void);
 void debugdump(void);
 
 /*
- * Uncomment CHAN5 to use it as an additional input.
+ * Uncomment CHAN5 to use it as an additional input on a normal Arduino.
  * You'll need to change the number of channels in the device profile as well.
+ *
+ * Arduino device profile:      ols.profile-agla.cfg
+ * Arduino Mega device profile: ols.profile-aglam.cfg
  */
+#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+#define CHANPIN PINA
+#define CHAN0 22
+#define CHAN1 23
+#define CHAN2 24
+#define CHAN3 25
+#define CHAN4 26
+#define CHAN5 27
+#define CHAN6 28
+#define CHAN7 29
+#else
+#define CHANPIN PINB
 #define CHAN0 8
 #define CHAN1 9
 #define CHAN2 10
 #define CHAN3 11
 #define CHAN4 12
 //#define CHAN5 13
+#endif
 #define ledPin 13
 
 /* XON/XOFF are not supported. */
@@ -113,13 +146,22 @@ void debugdump(void);
 
 /*
  * Capture size of 1024 bytes works on the ATmega328.
+ * Capture size of XXXX bytes works on the ATmega2560.
  *
  */
+#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+#define DEBUG_CAPTURE_SIZE 7168
+#define CAPTURE_SIZE 7168
+#else
+#define DEBUG_CAPTURE_SIZE 1024
+#define CAPTURE_SIZE 1024
+#endif /* Mega */
+
 #define DEBUG
 #ifdef DEBUG
-#define MAX_CAPTURE_SIZE 1024
+#define MAX_CAPTURE_SIZE DEBUG_CAPTURE_SIZE
 #else
-#define MAX_CAPTURE_SIZE 1024
+#define MAX_CAPTURE_SIZE CAPTURE_SIZE
 #endif /* DEBUG */
 
 /*
@@ -162,11 +204,18 @@ void setup()
   pinMode(CHAN2, INPUT);
   pinMode(CHAN3, INPUT);
   pinMode(CHAN4, INPUT);
+#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+  pinMode(CHAN5, INPUT);
+  pinMode(CHAN6, INPUT);
+  pinMode(CHAN7, INPUT);
+  pinMode(ledPin, OUTPUT);
+#else
 #ifdef CHAN5
   pinMode(CHAN5, INPUT);
 #else
   pinMode(ledPin, OUTPUT);
 #endif /* CHAN5 */
+#endif /* Mega */
 }
 
 void loop()
@@ -322,14 +371,12 @@ void loop()
   }
 }
 
-#ifndef CHAN5
 void blinkled() {
   digitalWrite(ledPin, HIGH);
   delay(200);
   digitalWrite(ledPin, LOW);
   delay(200);
 }
-#endif /* !CHAN5 */
 
 /*
  * Extended SUMP commands are 5 bytes.  A command byte followed by 4 bytes
@@ -380,7 +427,7 @@ void captureMicro() {
    * this needs further testing, but basic tests work as expected.
    */
   if (trigger) {
-    while ((trigger_values ^ PINB) & trigger);
+    while ((trigger_values ^ CHANPIN) & trigger);
   }
 
   /*
@@ -414,7 +461,7 @@ void captureMicro() {
      */
     PORTD = B10000000; /* debug timing measurement */
     for (i = 0 ; i < readCount; i++) {
-      logicdata[i] = PINB;
+      logicdata[i] = CHANPIN;
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
     }
@@ -427,7 +474,7 @@ void captureMicro() {
      */
     PORTD = B10000000; /* debug timing measurement */
     for (i = 0 ; i < readCount; i++) {
-      logicdata[i] = PINB;
+      logicdata[i] = CHANPIN;
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
@@ -446,7 +493,7 @@ void captureMicro() {
      */
     PORTD = B10000000; /* debug timing measurement */
     for (i = 0 ; i < readCount; i++) {
-      logicdata[i] = PINB;
+      logicdata[i] = CHANPIN;
       delayMicroseconds(delayTime - 1);
       __asm__("nop\n\t""nop\n\t");
     }
@@ -489,11 +536,11 @@ void captureMilli() {
    * very basic trigger, just like in captureMicros() above.
    */
   if (trigger) {
-    while ((trigger_values ^ PINB) & trigger);
+    while ((trigger_values ^ CHANPIN) & trigger);
   }
 
   for (i = 0 ; i < readCount; i++) {
-    logicdata[i] = PINB;
+    logicdata[i] = CHANPIN;
     delay(delayTime);
   }
   for (i = 0 ; i < readCount; i++) {
@@ -557,12 +604,12 @@ void triggerMicro() {
     /*
      * 500KHz case.  We should be able to manage this in time.
      *
-     * busy loop reading PINB until we trigger.
+     * busy loop reading CHANPIN until we trigger.
      * we always start capturing at the start of the buffer
      * and use it as a circular buffer
      */
     PORTD = B10000000; /* debug timing measurement */
-    while ((trigger_values ^ (logicdata[logicIndex] = PINB)) & trigger) {
+    while ((trigger_values ^ (logicdata[logicIndex] = CHANPIN)) & trigger) {
       /* PORTD = B00000000; */
       /* increment index. */
       logicIndex++;
@@ -604,7 +651,7 @@ void triggerMicro() {
       if (logicIndex >= readCount) {
         logicIndex = 0;
       }
-      logicdata[logicIndex++] = PINB;
+      logicdata[logicIndex++] = CHANPIN;
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
@@ -617,13 +664,13 @@ void triggerMicro() {
      * Less than 500KHz case.  This uses delayMicroseconds() and some padding
      * to get precise timing, at least for the after trigger samples.
      *
-     * busy loop reading PINB until we trigger.
+     * busy loop reading CHANPIN until we trigger.
      * we always start capturing at the start of the buffer
      * and use it as a circular buffer
      *
      */
     PORTD = B10000000; /* debug timing measurement */
-    while ((trigger_values ^ (logicdata[logicIndex] = PINB)) & trigger) {
+    while ((trigger_values ^ (logicdata[logicIndex] = CHANPIN)) & trigger) {
       /* PORTD = B00000000; */
       /* increment index. */
       logicIndex++;
@@ -649,7 +696,7 @@ void triggerMicro() {
       if (logicIndex >= readCount) {
         logicIndex = 0;
       }
-      logicdata[logicIndex++] = PINB;
+      logicdata[logicIndex++] = CHANPIN;
       delayMicroseconds(delayTime - 3);
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
@@ -717,6 +764,9 @@ void get_metadata() {
   Serial.print('G', BYTE);
   Serial.print('L', BYTE);
   Serial.print('A', BYTE);
+#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+  Serial.print('M', BYTE);
+#endif /* Mega */
   Serial.print('v', BYTE);
   Serial.print('0', BYTE);
   Serial.print(0x00, BYTE);
@@ -725,7 +775,11 @@ void get_metadata() {
   Serial.print(0x21, BYTE);
   Serial.print(0x00, BYTE);
   Serial.print(0x00, BYTE);
+#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+  Serial.print(0x1C, BYTE);
+#else
   Serial.print(0x04, BYTE);
+#endif /* Mega */
   Serial.print(0x00, BYTE);
 
   /* sample rate (1MHz) */
@@ -735,13 +789,17 @@ void get_metadata() {
   Serial.print(0x42, BYTE);
   Serial.print(0x40, BYTE);
 
-  /* number of probes (5 by default) */
+  /* number of probes (5 by default on Arduino, 8 on Mega) */
   Serial.print(0x40, BYTE);
+#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+  Serial.print(0x08, BYTE);
+#else
 #ifdef CHAN5
   Serial.print(0x06, BYTE);
 #else
   Serial.print(0x05, BYTE);
 #endif /* CHAN5 */
+#endif /* Mega */
 
   /* protocol version (2) */
   Serial.print(0x41, BYTE);
