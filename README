@@ -36,7 +36,10 @@ use these settings:
 
 Sampling rate: 1MHz (or lower)
 Channel Groups: 0 (zero) only
-Recording Size: 1024 (or lower), 7168 (or lower) for the Arduino Mega
+Recording Size:
+   ATmega186:  532 (or lower)
+   ATmega328:  1024 (or lower)
+   ATmega2560: 7168 (or lower)
 Noise Filter: doesn't matter
 RLE: disabled (unchecked)
 
