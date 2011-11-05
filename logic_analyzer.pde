@@ -67,7 +67,7 @@
  * Sampling rate: 1MHz (or lower)
  * Channel Groups: 0 (zero) only
  * Recording Size:
- *    ATmega186:  532 (or lower)
+ *    ATmega168:  532 (or lower)
  *    ATmega328:  1024 (or lower)
  *    ATmega2560: 7168 (or lower)
  * Noise Filter: doesn't matter
@@ -147,7 +147,7 @@ void debugdump(void);
 #define SUMP_SELF_TEST 0x03
 #define SUMP_GET_METADATA 0x04
 
-/* ATmega186:  532 (or lower)
+/* ATmega168:  532 (or lower)
  * ATmega328:  1024 (or lower)
  * ATmega2560: 7168 (or lower)
  */
@@ -776,16 +776,23 @@ void get_metadata() {
   Serial.print('0', BYTE);
   Serial.print(0x00, BYTE);
 
-  /* sample memory (1024) */
+  /* sample memory */
   Serial.print(0x21, BYTE);
   Serial.print(0x00, BYTE);
   Serial.print(0x00, BYTE);
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+  /* 7168 bytes */
   Serial.print(0x1C, BYTE);
-#else
-  Serial.print(0x04, BYTE);
-#endif /* Mega */
   Serial.print(0x00, BYTE);
+#elif defined(__AVR_ATmega328__)
+  /* 1024 bytes */
+  Serial.print(0x04, BYTE);
+  Serial.print(0x00, BYTE);
+#else
+  /* 532 bytes */
+  Serial.print(0x02, BYTE);
+  Serial.print(0x14, BYTE);
+#endif /* Mega */
 
   /* sample rate (1MHz) */
   Serial.print(0x23, BYTE);
