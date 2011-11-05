@@ -37,7 +37,7 @@ use these settings:
 Sampling rate: 1MHz (or lower)
 Channel Groups: 0 (zero) only
 Recording Size:
-   ATmega186:  532 (or lower)
+   ATmega168:  532 (or lower)
    ATmega328:  1024 (or lower)
    ATmega2560: 7168 (or lower)
 Noise Filter: doesn't matter
