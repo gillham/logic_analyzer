@@ -78,7 +78,7 @@
  * until after the trigger fires.
  * Please try it out and report back.
  *
- * Release: v0.04 August 3, 2011.
+ * Release: v0.05 November 4, 2011.
  *
  */
 
