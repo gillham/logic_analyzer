@@ -66,7 +66,10 @@
  * 
  * Sampling rate: 1MHz (or lower)
  * Channel Groups: 0 (zero) only
- * Recording Size: 1024 (or lower), 7168 (or lower) for the Arduino Mega
+ * Recording Size:
+ *    ATmega186:  532 (or lower)
+ *    ATmega328:  1024 (or lower)
+ *    ATmega2560: 7168 (or lower)
  * Noise Filter: doesn't matter
  * RLE: disabled (unchecked)
  *
@@ -144,18 +147,20 @@ void debugdump(void);
 #define SUMP_SELF_TEST 0x03
 #define SUMP_GET_METADATA 0x04
 
-/*
- * Capture size of 1024 bytes works on the ATmega328.
- * Capture size of XXXX bytes works on the ATmega2560.
- *
+/* ATmega186:  532 (or lower)
+ * ATmega328:  1024 (or lower)
+ * ATmega2560: 7168 (or lower)
  */
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
-#define DEBUG_CAPTURE_SIZE 7168
-#define CAPTURE_SIZE 7168
+  #define DEBUG_CAPTURE_SIZE 7168
+  #define CAPTURE_SIZE 7168
+#elif defined(__AVR_ATmega328__)
+  #define DEBUG_CAPTURE_SIZE 1024
+  #define CAPTURE_SIZE 1024
 #else
-#define DEBUG_CAPTURE_SIZE 1024
-#define CAPTURE_SIZE 1024
-#endif /* Mega */
+  #define DEBUG_CAPTURE_SIZE 532
+  #define CAPTURE_SIZE 532
+#endif
 
 #define DEBUG
 #ifdef DEBUG
