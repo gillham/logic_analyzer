@@ -48,5 +48,8 @@ below 1MHz.  1MHz works for a basic busy wait trigger that doesn't store
 until after the trigger fires.
 Please try it out and report back.
 
-Release: v0.05 November 4, 2011.
+This master branch now supports Arduino 1.0 only.
+Checkout branch logic_analyzer_v0_5 for Arduino 22 support.
+
+Release: v0.06 November 4, 2011.
 
