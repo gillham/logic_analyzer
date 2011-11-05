@@ -154,7 +154,7 @@ void debugdump(void);
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
   #define DEBUG_CAPTURE_SIZE 7168
   #define CAPTURE_SIZE 7168
-#elif defined(__AVR_ATmega328__)
+#elif defined(__AVR_ATmega328P__)
   #define DEBUG_CAPTURE_SIZE 1024
   #define CAPTURE_SIZE 1024
 #else
@@ -784,7 +784,7 @@ void get_metadata() {
   /* 7168 bytes */
   Serial.print(0x1C, BYTE);
   Serial.print(0x00, BYTE);
-#elif defined(__AVR_ATmega328__)
+#elif defined(__AVR_ATmega328P__)
   /* 1024 bytes */
   Serial.print(0x04, BYTE);
   Serial.print(0x00, BYTE);
