@@ -154,7 +154,7 @@ void debugdump(void);
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
   #define DEBUG_CAPTURE_SIZE 7168
   #define CAPTURE_SIZE 7168
-#elif defined(__AVR_ATmega328__)
+#elif defined(__AVR_ATmega328P__)
   #define DEBUG_CAPTURE_SIZE 1024
   #define CAPTURE_SIZE 1024
 #else
@@ -239,10 +239,10 @@ void loop()
       break;
     case SUMP_QUERY:
       /* return the expected bytes. */
-      Serial.print('1', BYTE);
-      Serial.print('A', BYTE);
-      Serial.print('L', BYTE);
-      Serial.print('S', BYTE);
+      Serial.write('1');
+      Serial.write('A');
+      Serial.write('L');
+      Serial.write('S');
       break;
     case SUMP_ARM:
       /*
@@ -513,7 +513,7 @@ void captureMicro() {
    * is done for any triggers, this is effectively the 0/100 buffer split.
    */
   for (i = 0 ; i < readCount; i++) {
-    Serial.print(logicdata[i], BYTE);
+    Serial.write(logicdata[i]);
   }
 }
 
@@ -549,7 +549,7 @@ void captureMilli() {
     delay(delayTime);
   }
   for (i = 0 ; i < readCount; i++) {
-    Serial.print(logicdata[i], BYTE);
+    Serial.write(logicdata[i]);
   }
 }
 
@@ -728,7 +728,7 @@ void triggerMicro() {
     if (logicIndex >= readCount) {
       logicIndex = 0;
     }
-    Serial.print(logicdata[logicIndex++], BYTE);
+    Serial.write(logicdata[logicIndex++]);
   }
 }
 
@@ -764,61 +764,61 @@ void setupDelay() {
  */
 void get_metadata() {
   /* device name */
-  Serial.print(0x01, BYTE);
-  Serial.print('A', BYTE);
-  Serial.print('G', BYTE);
-  Serial.print('L', BYTE);
-  Serial.print('A', BYTE);
+  Serial.write((uint8_t)0x01);
+  Serial.write('A');
+  Serial.write('G');
+  Serial.write('L');
+  Serial.write('A');
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
-  Serial.print('M', BYTE);
+  Serial.write('M');
 #endif /* Mega */
-  Serial.print('v', BYTE);
-  Serial.print('0', BYTE);
-  Serial.print(0x00, BYTE);
+  Serial.write('v');
+  Serial.write('0');
+  Serial.write((uint8_t)0x00);
 
   /* sample memory */
-  Serial.print(0x21, BYTE);
-  Serial.print(0x00, BYTE);
-  Serial.print(0x00, BYTE);
+  Serial.write((uint8_t)0x21);
+  Serial.write((uint8_t)0x00);
+  Serial.write((uint8_t)0x00);
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
   /* 7168 bytes */
-  Serial.print(0x1C, BYTE);
-  Serial.print(0x00, BYTE);
-#elif defined(__AVR_ATmega328__)
+  Serial.write((uint8_t)0x1C);
+  Serial.write((uint8_t)0x00);
+#elif defined(__AVR_ATmega328P__)
   /* 1024 bytes */
-  Serial.print(0x04, BYTE);
-  Serial.print(0x00, BYTE);
+  Serial.write((uint8_t)0x04);
+  Serial.write((uint8_t)0x00);
 #else
   /* 532 bytes */
-  Serial.print(0x02, BYTE);
-  Serial.print(0x14, BYTE);
+  Serial.write((uint8_t)0x02);
+  Serial.write((uint8_t)0x14);
 #endif /* Mega */
 
   /* sample rate (1MHz) */
-  Serial.print(0x23, BYTE);
-  Serial.print(0x00, BYTE);
-  Serial.print(0x0F, BYTE);
-  Serial.print(0x42, BYTE);
-  Serial.print(0x40, BYTE);
+  Serial.write((uint8_t)0x23);
+  Serial.write((uint8_t)0x00);
+  Serial.write((uint8_t)0x0F);
+  Serial.write((uint8_t)0x42);
+  Serial.write((uint8_t)0x40);
 
   /* number of probes (5 by default on Arduino, 8 on Mega) */
-  Serial.print(0x40, BYTE);
+  Serial.write((uint8_t)0x40);
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
-  Serial.print(0x08, BYTE);
+  Serial.write((uint8_t)0x08);
 #else
 #ifdef CHAN5
-  Serial.print(0x06, BYTE);
+  Serial.write((uint8_t)0x06);
 #else
-  Serial.print(0x05, BYTE);
+  Serial.write((uint8_t)0x05);
 #endif /* CHAN5 */
 #endif /* Mega */
 
   /* protocol version (2) */
-  Serial.print(0x41, BYTE);
-  Serial.print(0x02, BYTE);
+  Serial.write((uint8_t)0x41);
+  Serial.write((uint8_t)0x02);
 
   /* end of data */
-  Serial.print(0x00, BYTE);  
+  Serial.write((uint8_t)0x00);  
 }
 
 /*
@@ -855,7 +855,7 @@ void debugprint() {
     } 
     else {
       Serial.print(savebytes[i], HEX);
-      Serial.print(' ', BYTE);
+      Serial.write(' ');
     }
   }
   Serial.println("done...");
