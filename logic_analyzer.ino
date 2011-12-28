@@ -102,20 +102,31 @@ void debugdump(void);
  * Uncomment CHAN5 to use it as an additional input on a normal Arduino.
  * You'll need to change the number of channels in the device profile as well.
  *
+ * Uncomment MEGARAM if you have an Arduino Mega with an external SRAM board with
+ * at least 64KB on it.
+ *
  * Arduino device profile:      ols.profile-agla.cfg
  * Arduino Mega device profile: ols.profile-aglam.cfg
+ * Arduino Mega RAM device profile: ols.profile-aglamr.cfg
  */
+
+#define MEGARAM 1
+
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
-#define CHANPIN PINA
-#define CHAN0 22
-#define CHAN1 23
-#define CHAN2 24
-#define CHAN3 25
-#define CHAN4 26
-#define CHAN5 27
-#define CHAN6 28
-#define CHAN7 29
+#define DEBUGPORT PORTH
+#define DEBUGDDR DDRH
+#define CHANPIN PINF
+#define CHAN0 A0
+#define CHAN1 A1
+#define CHAN2 A2
+#define CHAN3 A3
+#define CHAN4 A4
+#define CHAN5 A5
+#define CHAN6 A6
+#define CHAN7 A7
 #else
+#define DEBUGPORT PORTD
+#define DEBUGDDR DDRD
 #define CHANPIN PINB
 #define CHAN0 8
 #define CHAN1 9
@@ -147,11 +158,20 @@ void debugdump(void);
 #define SUMP_SELF_TEST 0x03
 #define SUMP_GET_METADATA 0x04
 
-/* ATmega168:  532 (or lower)
- * ATmega328:  1024 (or lower)
- * ATmega2560: 7168 (or lower)
+
+/*
+ * Default capture buffer sizes. Lower values should work, but the metadata and/or
+ * device profiles will need to be adjusted to match.
+ * ATmega168:  532
+ * ATmega328:  1024 (1KB)
+ * ATmega2560: 7168 (7KB)
+ * ATmega2560+external SRAM: 56320 (55KB)
  */
-#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+
+#if defined(MEGARAM)
+  #define DEBUG_CAPTURE_SIZE 56320
+  #define CAPTURE_SIZE 56320
+#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
   #define DEBUG_CAPTURE_SIZE 7168
   #define CAPTURE_SIZE 7168
 #elif defined(__AVR_ATmega328P__)
@@ -181,7 +201,20 @@ byte savebytes[128];
 int savecount = 0;
 #endif /* DEBUG */
 
+/*
+ * External SRAM adds 56,320 (55kb) directly addressable bytes starting at 0x2200.
+ * We access it via a hard coded pointer instead of a directly allocated array like
+ * on other Arduinos.
+ *
+ * We only use bank 0 as our capture routines can't spare the cycles to switch banks.
+ *
+ */
+
+#ifdef MEGARAM
+byte *logicdata = (byte *) 0x2200U; 
+#else
 byte logicdata[MAX_CAPTURE_SIZE];
+#endif
 unsigned int logicIndex = 0;
 unsigned int triggerIndex = 0;
 unsigned int readCount = MAX_CAPTURE_SIZE;
@@ -194,6 +227,17 @@ unsigned long divider = 0;
 
 void setup()
 {
+#ifdef MEGARAM
+  XMCRA = _BV(SRE); // Enable external memory interface
+  pinMode(38, OUTPUT); digitalWrite(38, LOW); // Enable RAM device
+  pinMode(42, OUTPUT);   // Make the bank selection bits output pins
+  pinMode(43, OUTPUT);   // Make the bank selection bits output pins
+  pinMode(44, OUTPUT);   // Make the bank selection bits output pins
+  digitalWrite(42, LOW); // Select bank 0 (see below for discussion)
+  digitalWrite(43, LOW); // Select bank 0 (see below for discussion)
+  digitalWrite(44, LOW); // Select bank 0 (see below for discussion)
+#endif // MEGARAM
+
   Serial.begin(115200);
 
   /*
@@ -202,7 +246,7 @@ void setup()
    * the sample time.  this is used during development to
    * properly pad out the sampling routines.
    */
-  DDRD = DDRD | B10000000; /* debug measurement pin */
+  DEBUGDDR = DEBUGDDR | B10000000; /* debug measurement pin */
 
   pinMode(CHAN0, INPUT);
   pinMode(CHAN1, INPUT);
@@ -225,7 +269,7 @@ void setup()
 
 void loop()
 {
-  int i;
+  unsigned int i;
 
   if (Serial.available() > 0) {
     cmdByte = Serial.read();
@@ -368,6 +412,12 @@ void loop()
        */
       debugdump();
       break;
+    case '3':
+      /*
+       * This samples the channel pin and writes to the serial port.  Used for debugging.
+       */
+      Serial.print(CHANPIN, HEX);
+      break;
 #endif /* DEBUG */
     default:
       /* ignore any unrecognized bytes. */
@@ -425,7 +475,7 @@ void getCmd() {
  */
 
 void captureMicro() {
-  int i;
+  unsigned int i;
 
   /*
    * basic trigger, wait until all trigger conditions are met on port B.
@@ -449,14 +499,14 @@ void captureMicro() {
    * any timing unexpectedly.
    * Arduino pin 7 is being used here.
    */
-  DDRD = DDRD | B10000000;
-  PORTD = B10000000;
+  DEBUGDDR = DEBUGDDR | B10000000;
+  DEBUGPORT = B10000000;
   delayMicroseconds(20);
-  PORTD = B00000000;
+  DEBUGPORT = B00000000;
   delayMicroseconds(20);
-  PORTD = B10000000;
+  DEBUGPORT = B10000000;
   delayMicroseconds(20);
-  PORTD = B00000000;
+  DEBUGPORT = B00000000;
   delayMicroseconds(20);
 
   if (delayTime == 1) {
@@ -464,30 +514,34 @@ void captureMicro() {
      * 1MHz sample rate = 1 uS delay so we can't use delayMicroseconds
      * since our loop takes some time.  The delay is padded out by hand.
      */
-    PORTD = B10000000; /* debug timing measurement */
+    DEBUGPORT = B10000000; /* debug timing measurement */
     for (i = 0 ; i < readCount; i++) {
       logicdata[i] = CHANPIN;
+#ifndef MEGARAM
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+#endif /* MEGARAM */
     }
-    PORTD = B00000000; /* debug timing measurement */
+    DEBUGPORT = B00000000; /* debug timing measurement */
   } 
   else if (delayTime == 2) {
     /*
      * 500KHz sample rate = 2 uS delay, still pretty fast so we pad this
      * one by hand too.
      */
-    PORTD = B10000000; /* debug timing measurement */
+    DEBUGPORT = B10000000; /* debug timing measurement */
     for (i = 0 ; i < readCount; i++) {
       logicdata[i] = CHANPIN;
+#ifndef MEGARAM
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+#endif /* MEGARAM */
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
     }
-    PORTD = B00000000; /* debug timing measurement */
+    DEBUGPORT = B00000000; /* debug timing measurement */
   } 
   else {
     /*
@@ -496,13 +550,15 @@ void captureMicro() {
      * a better logic analyzer)
      * start of real measurement
      */
-    PORTD = B10000000; /* debug timing measurement */
+    DEBUGPORT = B10000000; /* debug timing measurement */
     for (i = 0 ; i < readCount; i++) {
       logicdata[i] = CHANPIN;
       delayMicroseconds(delayTime - 1);
+#ifndef MEGARAM
       __asm__("nop\n\t""nop\n\t");
+#endif /* MEGARAM */
     }
-    PORTD = B00000000; /* debug timing measurement */
+    DEBUGPORT = B00000000; /* debug timing measurement */
   }
 
   /* re-enable interrupts now that we're done sampling. */
@@ -535,7 +591,7 @@ void captureMicro() {
  * this basic functionality.
  */
 void captureMilli() {
-  int i;
+  unsigned int i;
 
   /*
    * very basic trigger, just like in captureMicros() above.
@@ -562,7 +618,7 @@ void captureMilli() {
  * 
  */
 void triggerMicro() {
-  int i = 0;
+  unsigned int i = 0;
 
   logicIndex = 0;
   triggerIndex = 0;
@@ -581,14 +637,14 @@ void triggerMicro() {
    * any timing unexpectedly.
    * Arduino pin 7 is being used here.
    */
-  DDRD = DDRD | B10000000;
-  PORTD = B10000000;
+  DEBUGDDR = DEBUGDDR | B10000000;
+  DEBUGPORT = B10000000;
   delayMicroseconds(20);
-  PORTD = B00000000;
+  DEBUGPORT = B00000000;
   delayMicroseconds(20);
-  PORTD = B10000000;
+  DEBUGPORT = B10000000;
   delayMicroseconds(20);
-  PORTD = B00000000;
+  DEBUGPORT = B00000000;
   delayMicroseconds(20);
 
   if (delayTime == 1) {
@@ -613,9 +669,9 @@ void triggerMicro() {
      * we always start capturing at the start of the buffer
      * and use it as a circular buffer
      */
-    PORTD = B10000000; /* debug timing measurement */
+    DEBUGPORT = B10000000; /* debug timing measurement */
     while ((trigger_values ^ (logicdata[logicIndex] = CHANPIN)) & trigger) {
-      /* PORTD = B00000000; */
+      /* DEBUGPORT = B00000000; */
       /* increment index. */
       logicIndex++;
       if (logicIndex >= readCount) {
@@ -626,12 +682,16 @@ void triggerMicro() {
        * without pin toggles, will try 1 nop.
        * __asm__("nop\n\t""nop\n\t""nop\n\t");
        */
+#ifndef MEGARAM
       __asm__("nop\n\t");
-      /* PORTD = B10000000; */
+#endif /* MEGARAM */
+      /* DEBUGPORT = B10000000; */
     }
     /* this pads the immediate trigger case to 2.0 uS, just as an example. */
+#ifndef MEGARAM
     __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
-    PORTD = B00000000; /* debug timing measurement */
+#endif /* MEGARAM */
+    DEBUGPORT = B00000000; /* debug timing measurement */
 
     /* 
      * One sample size delay. ends up being 2 uS combined with assignment
@@ -639,14 +699,16 @@ void triggerMicro() {
      * between the trigger point and the subsequent samples.
      */
     delayMicroseconds(1);
+#ifndef MEGARAM
     __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
     __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+#endif /* MEGARAM */
 
     /* 'logicIndex' now points to trigger sample, keep track of it */
     triggerIndex = logicIndex;
 
     /* keep sampling for delayCount after trigger */
-    PORTD = B10000000; /* debug timing measurement */
+    DEBUGPORT = B10000000; /* debug timing measurement */
     /*
      * this is currently taking:
      * 1025.5 uS for 512 samples. (512 samples, 0/100 split)
@@ -657,11 +719,13 @@ void triggerMicro() {
         logicIndex = 0;
       }
       logicdata[logicIndex++] = CHANPIN;
+#ifndef MEGARAM
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+#endif /* MEGARAM */
     }
-    PORTD = B00000000; /* debug timing measurement */
+    DEBUGPORT = B00000000; /* debug timing measurement */
     delayMicroseconds(100);
   } 
   else {
@@ -674,17 +738,17 @@ void triggerMicro() {
      * and use it as a circular buffer
      *
      */
-    PORTD = B10000000; /* debug timing measurement */
+    DEBUGPORT = B10000000; /* debug timing measurement */
     while ((trigger_values ^ (logicdata[logicIndex] = CHANPIN)) & trigger) {
-      /* PORTD = B00000000; */
+      /* DEBUGPORT = B00000000; */
       /* increment index. */
       logicIndex++;
       if (logicIndex >= readCount) {
         logicIndex = 0;
       }
-      /* PORTD = B10000000; */
+      /* DEBUGPORT = B10000000; */
     }
-    PORTD = B00000000; /* debug timing measurement */
+    DEBUGPORT = B00000000; /* debug timing measurement */
 
     /* 'logicIndex' now points to trigger sample, keep track of it */
     triggerIndex = logicIndex;
@@ -696,18 +760,20 @@ void triggerMicro() {
     delayMicroseconds(delayTime);
 
     /* keep sampling for delayCount after trigger */
-    PORTD = B10000000; /* debug timing measurement */
+    DEBUGPORT = B10000000; /* debug timing measurement */
     for (i = 0 ; i < delayCount; i++) {
       if (logicIndex >= readCount) {
         logicIndex = 0;
       }
       logicdata[logicIndex++] = CHANPIN;
       delayMicroseconds(delayTime - 3);
+#ifndef MEGARAM
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+#endif /* MEGARAM */
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t");
     }
-    PORTD = B00000000; /* debug timing measurement */
+    DEBUGPORT = B00000000; /* debug timing measurement */
     delayMicroseconds(100);
   }
 
@@ -772,6 +838,9 @@ void get_metadata() {
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
   Serial.write('M');
 #endif /* Mega */
+#if defined(MEGARAM)
+  Serial.write('R');
+#endif /* MEGARAM */
   Serial.write('v');
   Serial.write('0');
   Serial.write((uint8_t)0x00);
@@ -780,12 +849,16 @@ void get_metadata() {
   Serial.write((uint8_t)0x21);
   Serial.write((uint8_t)0x00);
   Serial.write((uint8_t)0x00);
-#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
-  /* 7168 bytes */
+#if defined(MEGARAM)
+  /* 56320 bytes (55KB) */
+  Serial.write((uint8_t)0xDC);
+  Serial.write((uint8_t)0x00);
+#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+  /* 7168 bytes (7KB) */
   Serial.write((uint8_t)0x1C);
   Serial.write((uint8_t)0x00);
 #elif defined(__AVR_ATmega328P__)
-  /* 1024 bytes */
+  /* 1024 bytes (1KB) */
   Serial.write((uint8_t)0x04);
   Serial.write((uint8_t)0x00);
 #else
@@ -866,7 +939,7 @@ void debugprint() {
  * of the sample buffer.
  */
 void debugdump() {
-  int i;
+  unsigned int i;
   int j = 1;
 
   Serial.print("\r\n");
