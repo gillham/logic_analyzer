@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: logic_analyzer.pde,v 1.17 2011-08-04 02:31:01 gillham Exp $
+ *	$Id: logic_analyzer.ino,v 1.21 2012/02/27 20:19:44 gillham Exp $
  *
  */
 
@@ -152,14 +152,14 @@ void debugdump(void);
  * ATmega2560: 7168 (or lower)
  */
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
-  #define DEBUG_CAPTURE_SIZE 7168
-  #define CAPTURE_SIZE 7168
+#define DEBUG_CAPTURE_SIZE 7168
+#define CAPTURE_SIZE 7168
 #elif defined(__AVR_ATmega328P__)
-  #define DEBUG_CAPTURE_SIZE 1024
-  #define CAPTURE_SIZE 1024
+#define DEBUG_CAPTURE_SIZE 1024
+#define CAPTURE_SIZE 1024
 #else
-  #define DEBUG_CAPTURE_SIZE 532
-  #define CAPTURE_SIZE 532
+#define DEBUG_CAPTURE_SIZE 532
+#define CAPTURE_SIZE 532
 #endif
 
 #define DEBUG
@@ -682,6 +682,12 @@ void triggerMicro() {
       if (logicIndex >= readCount) {
         logicIndex = 0;
       }
+      else {
+        /* pad the same number of cycles as the above assignment (needs verification) */
+        __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+      }
+      delayMicroseconds(delayTime - 3);
+      __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       /* PORTD = B10000000; */
     }
     PORTD = B00000000; /* debug timing measurement */
@@ -693,7 +699,10 @@ void triggerMicro() {
      * This needs adjustment so that we have the right spacing between the
      * before trigger samples and the after trigger samples.
      */
-    delayMicroseconds(delayTime);
+    delayMicroseconds(delayTime - 2);
+    __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+    __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+    __asm__("nop\n\t""nop\n\t""nop\n\t");
 
     /* keep sampling for delayCount after trigger */
     PORTD = B10000000; /* debug timing measurement */
@@ -882,5 +891,8 @@ void debugdump() {
   }
 }
 #endif /* DEBUG */
+
+
+
 
 
