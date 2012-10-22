@@ -540,14 +540,14 @@ void captureMicro() {
 void captureMilli() {
   int i = 0;
 
-  /*
-   * very basic trigger, just like in captureMicros() above.
-   */
-  if (trigger) {
-    while ((trigger_values ^ (CHANPIN & B01111111)) & trigger);
-  }
-
   if(rleEnabled) {
+    /*
+     * very basic trigger, just like in captureMicros() above.
+     */
+    if (trigger) {
+      while ((trigger_values ^ (CHANPIN & B01111111)) & trigger);
+    }
+  
     byte lastSample = 0;
     byte sampleCount = 0;
     
@@ -573,6 +573,13 @@ void captureMilli() {
       i++;
     }
   } else {
+    /*
+     * very basic trigger, just like in captureMicros() above.
+     */
+    if (trigger) {
+      while ((trigger_values ^ CHANPIN) & trigger);
+    }
+  
     for (i = 0 ; i < readCount; i++) {
       logicdata[i] = CHANPIN;
       delay(delayTime);
@@ -763,7 +770,7 @@ void triggerMicro() {
    */
   logicIndex++;
 
-  for (i = 0 ; i < readCount; i++) {
+  for (; i < readCount; i++) {
     if (logicIndex >= readCount) {
       logicIndex = 0;
     }
