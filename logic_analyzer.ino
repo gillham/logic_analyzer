@@ -2,7 +2,7 @@
  *
  * SUMP Protocol Implementation for Arduino boards.
  *
- * Copyright (c) 2011 Andrew Gillham
+ * Copyright (c) 2011,2012,2013 Andrew Gillham
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
