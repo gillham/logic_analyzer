@@ -78,7 +78,7 @@
  * until after the trigger fires.
  * Please try it out and report back.
  *
- * Release: v0.06 November 4, 2011.
+ * Release: v0.07 February 8, 2013.
  *
  */
 
@@ -783,6 +783,13 @@ void get_metadata() {
 #endif /* Mega */
   Serial.write('v');
   Serial.write('0');
+  Serial.write((uint8_t)0x00);
+
+  /* firmware version */
+  Serial.write((uint8_t)0x02);
+  Serial.write('0');
+  Serial.write('.');
+  Serial.write('7');
   Serial.write((uint8_t)0x00);
 
   /* sample memory */
