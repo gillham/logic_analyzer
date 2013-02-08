@@ -142,6 +142,7 @@ void debugdump(void);
 #define SUMP_SET_DIVIDER 0x80
 #define SUMP_SET_READ_DELAY_COUNT 0x81
 #define SUMP_SET_FLAGS 0x82
+#define SUMP_SET_RLE 0x0100
 
 /* extended commands -- self-test unsupported, but metadata is returned. */
 #define SUMP_SELF_TEST 0x03
@@ -191,6 +192,7 @@ unsigned int trigger_values = 0;
 unsigned int useMicro = 0;
 unsigned int delayTime = 0;
 unsigned long divider = 0;
+boolean rleEnabled = 0;
 
 void setup()
 {
@@ -323,8 +325,9 @@ void loop()
         delayCount = MAX_CAPTURE_SIZE;
       break;
     case SUMP_SET_FLAGS:
-      /* read the rest of the command bytes, but ignore them. */
+      /* read the rest of the command bytes and check if RLE is enabled. */
       getCmd();
+      rleEnabled = ((cmdBytes[1] & B1000000) != 0);
       break;
     case SUMP_GET_METADATA:
       /*
@@ -535,18 +538,53 @@ void captureMicro() {
  * this basic functionality.
  */
 void captureMilli() {
-  int i;
+  int i = 0;
 
-  /*
-   * very basic trigger, just like in captureMicros() above.
-   */
-  if (trigger) {
-    while ((trigger_values ^ CHANPIN) & trigger);
-  }
+  if(rleEnabled) {
+    /*
+     * very basic trigger, just like in captureMicros() above.
+     */
+    if (trigger) {
+      while ((trigger_values ^ (CHANPIN & B01111111)) & trigger);
+    }
 
-  for (i = 0 ; i < readCount; i++) {
-    logicdata[i] = CHANPIN;
-    delay(delayTime);
+    byte lastSample = 0;
+    byte sampleCount = 0;
+
+    while(i < readCount) {
+      /*
+       * Implementation of the RLE unlimited protocol: timings might be off a little
+       */
+      if(lastSample == (CHANPIN & B01111111) && sampleCount < 127) {
+        sampleCount++;
+        delay(delayTime);
+        continue;
+      }
+      if(sampleCount != 0) {
+        logicdata[i] = B10000000 | sampleCount;
+        sampleCount = 0;
+        i++;
+        continue;
+      }
+      logicdata[i] = (CHANPIN & B01111111);
+      lastSample = (CHANPIN & B01111111);
+      delay(delayTime);
+
+      i++;
+    }
+  } 
+  else {
+    /*
+     * very basic trigger, just like in captureMicros() above.
+     */
+    if (trigger) {
+      while ((trigger_values ^ CHANPIN) & trigger);
+    }
+
+    for (i = 0 ; i < readCount; i++) {
+      logicdata[i] = CHANPIN;
+      delay(delayTime);
+    }
   }
   for (i = 0 ; i < readCount; i++) {
     Serial.write(logicdata[i]);
@@ -863,6 +901,8 @@ void debugprint() {
   Serial.println(logicIndex, DEC);
   Serial.print("triggerIndex = ");
   Serial.println(triggerIndex, DEC);
+  Serial.print("rleEnabled = ");
+  Serial.println(rleEnabled, DEC);
 
   Serial.println("Bytes:");
 
@@ -899,8 +939,4 @@ void debugdump() {
   }
 }
 #endif /* DEBUG */
-
-
-
-
 
