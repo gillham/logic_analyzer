@@ -789,6 +789,7 @@ void get_metadata() {
   Serial.write((uint8_t)0x02);
   Serial.write('0');
   Serial.write('.');
+  Serial.write('0');
   Serial.write('7');
   Serial.write((uint8_t)0x00);
 
