@@ -35,11 +35,8 @@
  *	http://www.lxtreme.nl/ols/
  *
  * This SUMP protocol compatible logic analyzer for the Arduino board supports
- * 5 channels consisting of digital pins 8-12, which are the first 5 bits (0-4)
- * of PORTB. Arduino pin 13 / bit 5 is the Arduino LED, bits 6 & 7 are the
- * crystal oscillator pins.
- * Uncomment CHAN5 below if you want to use the LED pin as an input and have
- * 6 channels.
+ * 6 channels consisting of digital pins 2-7, which are the last 6 bits (2-7)
+ * of PORTD.  Bits 0 & 1 are the UART RX/TX pins.
  *
  * On the Arduino Mega board 8 channels are supported and 7k of samples.
  * Pins 22-29 (Port A) are used by default, you can change the 'CHANPIN' below
@@ -72,13 +69,14 @@
  *    ATmega2560: 7168 (or lower)
  * Noise Filter: doesn't matter
  * RLE: disabled (unchecked)
+ *    NOTE: Preliminary RLE support for 50Hz or less exists, please test it.
  *
  * Triggering is still a work in progress, but generally works for samples
  * below 1MHz.  1MHz works for a basic busy wait trigger that doesn't store
  * until after the trigger fires.
  * Please try it out and report back.
  *
- * Release: v0.07 February 8, 2013.
+ * Release: v0.08 February 8, 2013.
  *
  */
 
@@ -99,9 +97,6 @@ void debugprint(void);
 void debugdump(void);
 
 /*
- * Uncomment CHAN5 to use it as an additional input on a normal Arduino.
- * You'll need to change the number of channels in the device profile as well.
- *
  * Arduino device profile:      ols.profile-agla.cfg
  * Arduino Mega device profile: ols.profile-aglam.cfg
  */
@@ -116,13 +111,13 @@ void debugdump(void);
 #define CHAN6 28
 #define CHAN7 29
 #else
-#define CHANPIN PINB
-#define CHAN0 8
-#define CHAN1 9
-#define CHAN2 10
-#define CHAN3 11
-#define CHAN4 12
-//#define CHAN5 13
+#define CHANPIN PIND
+#define CHAN0 2
+#define CHAN1 3
+#define CHAN2 4
+#define CHAN3 5
+#define CHAN4 6
+#define CHAN5 7
 #endif
 #define ledPin 13
 
@@ -138,7 +133,7 @@ void debugdump(void);
 #define SUMP_TRIGGER_VALUES 0xC1
 #define SUMP_TRIGGER_CONFIG 0xC2
 
-/* flags are ignored. */
+/* Most flags (except RLE) are ignored. */
 #define SUMP_SET_DIVIDER 0x80
 #define SUMP_SET_READ_DELAY_COUNT 0x81
 #define SUMP_SET_FLAGS 0x82
@@ -163,6 +158,9 @@ void debugdump(void);
 #define CAPTURE_SIZE 532
 #endif
 
+#define DEBUG_ENABLE DDRB = DDRB | B00000001
+#define DEBUG_ON PORTB = B00000001
+#define DEBUG_OFF PORTB = B00000000
 #define DEBUG
 #ifdef DEBUG
 #define MAX_CAPTURE_SIZE DEBUG_CAPTURE_SIZE
@@ -199,30 +197,24 @@ void setup()
   Serial.begin(115200);
 
   /*
-   * set debug pin to output right away so it settles.
+   * set debug pin (digital pin 8) to output right away so it settles.
    * this gets toggled during sampling as a way to measure
    * the sample time.  this is used during development to
    * properly pad out the sampling routines.
    */
-  DDRD = DDRD | B10000000; /* debug measurement pin */
+  DEBUG_ENABLE; /* debug measurement pin */
 
   pinMode(CHAN0, INPUT);
   pinMode(CHAN1, INPUT);
   pinMode(CHAN2, INPUT);
   pinMode(CHAN3, INPUT);
   pinMode(CHAN4, INPUT);
-#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
   pinMode(CHAN5, INPUT);
+#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
   pinMode(CHAN6, INPUT);
   pinMode(CHAN7, INPUT);
-  pinMode(ledPin, OUTPUT);
-#else
-#ifdef CHAN5
-  pinMode(CHAN5, INPUT);
-#else
-  pinMode(ledPin, OUTPUT);
-#endif /* CHAN5 */
 #endif /* Mega */
+  pinMode(ledPin, OUTPUT);
 }
 
 void loop()
@@ -360,9 +352,7 @@ void loop()
        * you can use the Arduino serial monitor and send a '1' and get
        * a debug printout.  useless except for development.
        */
-#ifndef CHAN5
       blinkled();
-#endif /* !CHAN5 */
       debugprint();
       break;
     case '2':
@@ -431,7 +421,7 @@ void captureMicro() {
   int i;
 
   /*
-   * basic trigger, wait until all trigger conditions are met on port B.
+   * basic trigger, wait until all trigger conditions are met on port.
    * this needs further testing, but basic tests work as expected.
    */
   if (trigger) {
@@ -450,16 +440,16 @@ void captureMicro() {
    * this is used during development to measure the sample intervals.
    * it is best to just leave the toggling in place so we don't alter
    * any timing unexpectedly.
-   * Arduino pin 7 is being used here.
+   * Arduino digital pin 8 is being used here.
    */
-  DDRD = DDRD | B10000000;
-  PORTD = B10000000;
+  DEBUG_ENABLE;
+  DEBUG_ON;
   delayMicroseconds(20);
-  PORTD = B00000000;
+  DEBUG_OFF;
   delayMicroseconds(20);
-  PORTD = B10000000;
+  DEBUG_ON;
   delayMicroseconds(20);
-  PORTD = B00000000;
+  DEBUG_OFF;
   delayMicroseconds(20);
 
   if (delayTime == 1) {
@@ -467,20 +457,20 @@ void captureMicro() {
      * 1MHz sample rate = 1 uS delay so we can't use delayMicroseconds
      * since our loop takes some time.  The delay is padded out by hand.
      */
-    PORTD = B10000000; /* debug timing measurement */
+    DEBUG_ON; /* debug timing measurement */
     for (i = 0 ; i < readCount; i++) {
       logicdata[i] = CHANPIN;
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
     }
-    PORTD = B00000000; /* debug timing measurement */
+    DEBUG_OFF; /* debug timing measurement */
   } 
   else if (delayTime == 2) {
     /*
      * 500KHz sample rate = 2 uS delay, still pretty fast so we pad this
      * one by hand too.
      */
-    PORTD = B10000000; /* debug timing measurement */
+    DEBUG_ON; /* debug timing measurement */
     for (i = 0 ; i < readCount; i++) {
       logicdata[i] = CHANPIN;
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
@@ -490,7 +480,7 @@ void captureMicro() {
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
     }
-    PORTD = B00000000; /* debug timing measurement */
+    DEBUG_OFF; /* debug timing measurement */
   } 
   else {
     /*
@@ -499,13 +489,13 @@ void captureMicro() {
      * a better logic analyzer)
      * start of real measurement
      */
-    PORTD = B10000000; /* debug timing measurement */
+    DEBUG_ON; /* debug timing measurement */
     for (i = 0 ; i < readCount; i++) {
       logicdata[i] = CHANPIN;
       delayMicroseconds(delayTime - 1);
       __asm__("nop\n\t""nop\n\t");
     }
-    PORTD = B00000000; /* debug timing measurement */
+    DEBUG_OFF; /* debug timing measurement */
   }
 
   /* re-enable interrupts now that we're done sampling. */
@@ -516,7 +506,7 @@ void captureMicro() {
    * is done for any triggers, this is effectively the 0/100 buffer split.
    */
   for (i = 0 ; i < readCount; i++) {
-    Serial.write(logicdata[i]);
+    Serial.write(logicdata[i] >> 2);
   }
 }
 
@@ -587,7 +577,7 @@ void captureMilli() {
     }
   }
   for (i = 0 ; i < readCount; i++) {
-    Serial.write(logicdata[i]);
+    Serial.write(logicdata[i] >> 2);
   }
 }
 
@@ -617,16 +607,16 @@ void triggerMicro() {
    * this is used during development to measure the sample intervals.
    * it is best to just leave the toggling in place so we don't alter
    * any timing unexpectedly.
-   * Arduino pin 7 is being used here.
+   * Arduino digital pin 8 is being used here.
    */
-  DDRD = DDRD | B10000000;
-  PORTD = B10000000;
+  DEBUG_ENABLE;
+  DEBUG_ON;
   delayMicroseconds(20);
-  PORTD = B00000000;
+  DEBUG_OFF;
   delayMicroseconds(20);
-  PORTD = B10000000;
+  DEBUG_ON;
   delayMicroseconds(20);
-  PORTD = B00000000;
+  DEBUG_OFF;
   delayMicroseconds(20);
 
   if (delayTime == 1) {
@@ -651,9 +641,9 @@ void triggerMicro() {
      * we always start capturing at the start of the buffer
      * and use it as a circular buffer
      */
-    PORTD = B10000000; /* debug timing measurement */
+    DEBUG_ON; /* debug timing measurement */
     while ((trigger_values ^ (logicdata[logicIndex] = CHANPIN)) & trigger) {
-      /* PORTD = B00000000; */
+      /* DEBUG_OFF; */
       /* increment index. */
       logicIndex++;
       if (logicIndex >= readCount) {
@@ -665,11 +655,11 @@ void triggerMicro() {
        * __asm__("nop\n\t""nop\n\t""nop\n\t");
        */
       __asm__("nop\n\t");
-      /* PORTD = B10000000; */
+      /* DEBUG_ON; */
     }
     /* this pads the immediate trigger case to 2.0 uS, just as an example. */
     __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
-    PORTD = B00000000; /* debug timing measurement */
+    DEBUG_OFF; /* debug timing measurement */
 
     /* 
      * One sample size delay. ends up being 2 uS combined with assignment
@@ -684,7 +674,7 @@ void triggerMicro() {
     triggerIndex = logicIndex;
 
     /* keep sampling for delayCount after trigger */
-    PORTD = B10000000; /* debug timing measurement */
+    DEBUG_ON; /* debug timing measurement */
     /*
      * this is currently taking:
      * 1025.5 uS for 512 samples. (512 samples, 0/100 split)
@@ -699,7 +689,7 @@ void triggerMicro() {
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
     }
-    PORTD = B00000000; /* debug timing measurement */
+    DEBUG_OFF; /* debug timing measurement */
     delayMicroseconds(100);
   } 
   else {
@@ -712,9 +702,9 @@ void triggerMicro() {
      * and use it as a circular buffer
      *
      */
-    PORTD = B10000000; /* debug timing measurement */
+    DEBUG_ON; /* debug timing measurement */
     while ((trigger_values ^ (logicdata[logicIndex] = CHANPIN)) & trigger) {
-      /* PORTD = B00000000; */
+      /* DEBUG_OFF; */
       /* increment index. */
       logicIndex++;
       if (logicIndex >= readCount) {
@@ -726,9 +716,9 @@ void triggerMicro() {
       }
       delayMicroseconds(delayTime - 3);
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
-      /* PORTD = B10000000; */
+      /* DEBUG_ON; */
     }
-    PORTD = B00000000; /* debug timing measurement */
+    DEBUG_OFF; /* debug timing measurement */
 
     /* 'logicIndex' now points to trigger sample, keep track of it */
     triggerIndex = logicIndex;
@@ -743,7 +733,7 @@ void triggerMicro() {
     __asm__("nop\n\t""nop\n\t""nop\n\t");
 
     /* keep sampling for delayCount after trigger */
-    PORTD = B10000000; /* debug timing measurement */
+    DEBUG_ON; /* debug timing measurement */
     for (i = 0 ; i < delayCount; i++) {
       if (logicIndex >= readCount) {
         logicIndex = 0;
@@ -754,7 +744,7 @@ void triggerMicro() {
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
       __asm__("nop\n\t""nop\n\t""nop\n\t");
     }
-    PORTD = B00000000; /* debug timing measurement */
+    DEBUG_OFF; /* debug timing measurement */
     delayMicroseconds(100);
   }
 
@@ -775,7 +765,7 @@ void triggerMicro() {
     if (logicIndex >= readCount) {
       logicIndex = 0;
     }
-    Serial.write(logicdata[logicIndex++]);
+    Serial.write(logicdata[logicIndex++] >> 2);
   }
 }
 
@@ -856,16 +846,12 @@ void get_metadata() {
   Serial.write((uint8_t)0x42);
   Serial.write((uint8_t)0x40);
 
-  /* number of probes (5 by default on Arduino, 8 on Mega) */
+  /* number of probes (6 by default on Arduino, 8 on Mega) */
   Serial.write((uint8_t)0x40);
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
   Serial.write((uint8_t)0x08);
 #else
-#ifdef CHAN5
   Serial.write((uint8_t)0x06);
-#else
-  Serial.write((uint8_t)0x05);
-#endif /* CHAN5 */
 #endif /* Mega */
 
   /* protocol version (2) */
@@ -929,7 +915,7 @@ void debugdump() {
   Serial.print("\r\n");
 
   for (i = 0 ; i < MAX_CAPTURE_SIZE; i++) {
-    Serial.print(logicdata[i], HEX);
+    Serial.print(logicdata[i] >> 2, HEX);
     Serial.print(" ");
     if (j == 32) {
       Serial.print("\r\n");
