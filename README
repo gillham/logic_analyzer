@@ -1,6 +1,9 @@
 SUMP compatible logic analyzer for Arduino
 ==========================================
 
+NOTE: v0.08 switches the channels to pins 2-7 NOT 8-13 any longer.
+      Please report any issues.  For old behavior use v0.07.
+
 This Arduino sketch implements a SUMP protocol compatible with the standard
 SUMP client as well as the alternative client from here:
 	http://www.lxtreme.nl/ols/
@@ -51,5 +54,5 @@ Please try it out and report back.
 This master branch now supports Arduino 1.0 only.
 Checkout branch logic_analyzer_v0_5 for Arduino 22 support.
 
-Release: v0.07 February 8, 2013.
+Release: v0.08 February 8, 2013.
 

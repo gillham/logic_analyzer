@@ -30,6 +30,9 @@
  */
 
 /*
+ * NOTE: v0.08 switches the channels to pins 2-7 NOT 8-13 any longer.
+ *       Please report any issues.  For old behavior use v0.07.
+ *
  * This Arduino sketch implements a SUMP protocol compatible with the standard
  * SUMP client as well as the alternative client from here:
  *	http://www.lxtreme.nl/ols/
@@ -818,7 +821,7 @@ void get_metadata() {
   Serial.write('0');
   Serial.write('.');
   Serial.write('0');
-  Serial.write('7');
+  Serial.write('8');
   Serial.write((uint8_t)0x00);
 
   /* sample memory */
