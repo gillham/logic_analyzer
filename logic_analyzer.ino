@@ -100,8 +100,8 @@ void debugdump(void);
 
 
 /*
- * Should we use PORTD?  (default is PORTB)
- * PORTD support, especially for triggers is a bit broken.
+ * Should we use PORTD or PORTB?  (default is PORTB)
+ * PORTD support with triggers seems to work but needs more testing.
  */
 //#define USE_PORTD 1
 
