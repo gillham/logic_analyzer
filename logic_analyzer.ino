@@ -25,13 +25,12 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: logic_analyzer.ino,v 1.21 2012/02/27 20:19:44 gillham Exp $
  *
  */
 
 /*
- * NOTE: v0.08 switches the channels to pins 2-7 NOT 8-13 any longer.
- *       Please report any issues.  For old behavior use v0.07.
+ * NOTE: v0.09 switches the channels BACK to pins 8-13 for trigger reliability.
+ *       Please report any issues.  Uncomment USE_PORTD for pins 2-7.
  *
  * This Arduino sketch implements a SUMP protocol compatible with the standard
  * SUMP client as well as the alternative client from here:
@@ -79,7 +78,7 @@
  * until after the trigger fires.
  * Please try it out and report back.
  *
- * Release: v0.08 February 8, 2013.
+ * Release: v0.09 June 22, 2013.
  *
  */
 
@@ -99,6 +98,13 @@ void get_metadata(void);
 void debugprint(void);
 void debugdump(void);
 
+
+/*
+ * Should we use PORTD?  (default is PORTB)
+ * PORTD support, especially for triggers is a bit broken.
+ */
+//#define USE_PORTD 1
+
 /*
  * Arduino device profile:      ols.profile-agla.cfg
  * Arduino Mega device profile: ols.profile-aglam.cfg
@@ -114,6 +120,7 @@ void debugdump(void);
 #define CHAN6 28
 #define CHAN7 29
 #else
+#if defined(USE_PORTD)
 #define CHANPIN PIND
 #define CHAN0 2
 #define CHAN1 3
@@ -121,6 +128,16 @@ void debugdump(void);
 #define CHAN3 5
 #define CHAN4 6
 #define CHAN5 7
+#else
+#define CHANPIN PINB
+#define CHAN0 8
+#define CHAN1 9
+#define CHAN2 10
+#define CHAN3 11
+#define CHAN4 12
+/* Comment out CHAN5 if you don't want to use the LED pin for an input */
+#define CHAN5 13
+#endif /* USE_PORTD */
 #endif
 #define ledPin 13
 
@@ -161,9 +178,15 @@ void debugdump(void);
 #define CAPTURE_SIZE 532
 #endif
 
+#ifdef USE_PORTD
 #define DEBUG_ENABLE DDRB = DDRB | B00000001
 #define DEBUG_ON PORTB = B00000001
 #define DEBUG_OFF PORTB = B00000000
+#else
+#define DEBUG_ENABLE DDRD = DDRD | B10000000
+#define DEBUG_ON PORTD = B10000000
+#define DEBUG_OFF PORTD = B00000000
+#endif
 #define DEBUG
 #ifdef DEBUG
 #define MAX_CAPTURE_SIZE DEBUG_CAPTURE_SIZE
@@ -212,12 +235,17 @@ void setup()
   pinMode(CHAN2, INPUT);
   pinMode(CHAN3, INPUT);
   pinMode(CHAN4, INPUT);
+#ifdef CHAN5
   pinMode(CHAN5, INPUT);
+#endif
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
   pinMode(CHAN6, INPUT);
   pinMode(CHAN7, INPUT);
-#endif /* Mega */
+#else
+#ifndef CHAN5
   pinMode(ledPin, OUTPUT);
+#endif
+#endif /* Mega */
 }
 
 void loop()
@@ -281,7 +309,11 @@ void loop()
        * defines whether we're looking for it to be high or low.
        */
       getCmd();
+#ifdef USE_PORTD
+      trigger_values = cmdBytes[0] << 2;
+#else
       trigger_values = cmdBytes[0];
+#endif
       break;
     case SUMP_TRIGGER_CONFIG:
       /* read the rest of the command bytes, but ignore them. */
@@ -509,7 +541,11 @@ void captureMicro() {
    * is done for any triggers, this is effectively the 0/100 buffer split.
    */
   for (i = 0 ; i < readCount; i++) {
+#ifdef USE_PORTD
     Serial.write(logicdata[i] >> 2);
+#else
+    Serial.write(logicdata[i]);
+#endif
   }
 }
 
@@ -580,7 +616,11 @@ void captureMilli() {
     }
   }
   for (i = 0 ; i < readCount; i++) {
+#ifdef USE_PORTD
     Serial.write(logicdata[i] >> 2);
+#else
+    Serial.write(logicdata[i]);
+#endif
   }
 }
 
@@ -768,7 +808,11 @@ void triggerMicro() {
     if (logicIndex >= readCount) {
       logicIndex = 0;
     }
+#ifdef USE_PORTD
     Serial.write(logicdata[logicIndex++] >> 2);
+#else
+    Serial.write(logicdata[logicIndex++]);
+#endif
   }
 }
 
@@ -854,7 +898,11 @@ void get_metadata() {
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
   Serial.write((uint8_t)0x08);
 #else
+#ifdef CHAN5
   Serial.write((uint8_t)0x06);
+#else
+  Serial.write((uint8_t)0x05);
+#endif /* CHAN5 */
 #endif /* Mega */
 
   /* protocol version (2) */
@@ -918,7 +966,11 @@ void debugdump() {
   Serial.print("\r\n");
 
   for (i = 0 ; i < MAX_CAPTURE_SIZE; i++) {
+#ifdef USE_PORTD
     Serial.print(logicdata[i] >> 2, HEX);
+#else
+    Serial.print(logicdata[i], HEX);
+#endif
     Serial.print(" ");
     if (j == 32) {
       Serial.print("\r\n");
@@ -928,4 +980,10 @@ void debugdump() {
   }
 }
 #endif /* DEBUG */
+
+
+
+
+
+
 
