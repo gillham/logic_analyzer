@@ -301,7 +301,11 @@ void loop()
        * we can just use it directly as our trigger mask.
        */
       getCmd();
+#ifdef USE_PORTD
+      trigger = cmdBytes[0] << 2;
+#else
       trigger = cmdBytes[0];
+#endif
       break;
     case SUMP_TRIGGER_VALUES:
       /*
