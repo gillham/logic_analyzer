@@ -29,6 +29,16 @@
  */
 
 /*
+ * NOTE: This is an ALPHA of support for an Ethernet attached Logic Analyzer.
+ *       Tested with an Arduino Duemilanove and W5100 based Ethernet shield.
+ *       It may work with other combinations, but I haven't tested it.
+ *
+ *  USE: Configure the mac address (if you want) and the ip address (mandatory)
+ *       for your network and upload it.  In the OLS client select network
+ *       instead of serial and use your ip address and port 1234.
+ *       Click capture!  You should get some data back from your Arduino.
+ *
+ *
  * NOTE: v0.09 switches the channels BACK to pins 8-13 for trigger reliability.
  *       Please report any issues.  Uncomment USE_PORTD for pins 2-7.
  *
@@ -82,6 +92,8 @@
  *
  */
 
+#include <SPI.h>
+#include <Ethernet.h>
 /*
  * Function prototypes so this can compile from the cli.
  * You'll need the 'arduino-core' package and to check the paths in the
@@ -98,12 +110,11 @@ void get_metadata(void);
 void debugprint(void);
 void debugdump(void);
 
-
 /*
  * Should we use PORTD or PORTB?  (default is PORTB)
  * PORTD support with triggers seems to work but needs more testing.
  */
-//#define USE_PORTD 1
+#define USE_PORTD 1
 
 /*
  * Arduino device profile:      ols.profile-agla.cfg
@@ -218,9 +229,29 @@ unsigned int delayTime = 0;
 unsigned long divider = 0;
 boolean rleEnabled = 0;
 
+/*
+ * Enter a MAC address and IP address for your Arduino.
+ */
+byte mac[] = {
+  0x40, 0x00, 0x01, 0x02, 0x03, 0x04 };
+IPAddress ip(192,168,1,200);
+
+// Initialize the Ethernet server library
+// with the IP address and port you want to use
+// (port 80 is default for HTTP):
+EthernetServer server(1234);
+EthernetClient client;
+
+
 void setup()
 {
   Serial.begin(115200);
+
+  // start the Ethernet connection and the server:
+  Ethernet.begin(mac, ip);
+  server.begin();
+  Serial.print("server is at ");
+  Serial.println(Ethernet.localIP());
 
   /*
    * set debug pin (digital pin 8) to output right away so it settles.
@@ -231,16 +262,24 @@ void setup()
   DEBUG_ENABLE; /* debug measurement pin */
 
   pinMode(CHAN0, INPUT);
+  digitalWrite(CHAN0, LOW);
   pinMode(CHAN1, INPUT);
+  digitalWrite(CHAN1, LOW);
   pinMode(CHAN2, INPUT);
+  digitalWrite(CHAN2, LOW);
   pinMode(CHAN3, INPUT);
+  digitalWrite(CHAN3, LOW);
   pinMode(CHAN4, INPUT);
+  digitalWrite(CHAN4, LOW);
 #ifdef CHAN5
   pinMode(CHAN5, INPUT);
+  digitalWrite(CHAN5, LOW);
 #endif
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
   pinMode(CHAN6, INPUT);
+  digitalWrite(CHAN6, LOW);
   pinMode(CHAN7, INPUT);
+  digitalWrite(CHAN7, LOW);
 #else
 #ifndef CHAN5
   pinMode(ledPin, OUTPUT);
@@ -252,160 +291,170 @@ void loop()
 {
   int i;
 
-  if (Serial.available() > 0) {
-    cmdByte = Serial.read();
-    switch(cmdByte) {
-    case SUMP_RESET:
-      /*
+  // listen for incoming clients
+  client = server.available();
+  if (client) {
+    Serial.println("new client");
+    while (client.connected()) {
+      if (client.available()) {
+        cmdByte = client.read();
+        switch(cmdByte) {
+        case SUMP_RESET:
+          /*
        * We don't do anything here as some unsupported extended commands have
-       * zero bytes and are mistaken as resets.  This can trigger false resets
-       * so we don't erase the data or do anything for a reset.
-       */
-      break;
-    case SUMP_QUERY:
-      /* return the expected bytes. */
-      Serial.write('1');
-      Serial.write('A');
-      Serial.write('L');
-      Serial.write('S');
-      break;
-    case SUMP_ARM:
-      /*
+           * zero bytes and are mistaken as resets.  This can trigger false resets
+           * so we don't erase the data or do anything for a reset.
+           */
+          break;
+        case SUMP_QUERY:
+          /* return the expected bytes. */
+          client.write('1');
+          client.write('A');
+          client.write('L');
+          client.write('S');
+          break;
+        case SUMP_ARM:
+          /*
        * Zero out any previous samples before arming.
-       * Done here instead via reset due to spurious resets.
-       */
-      for (i = 0 ; i < MAX_CAPTURE_SIZE; i++) {
-        logicdata[i] = 0;
-      }
-      /*
+           * Done here instead via reset due to spurious resets.
+           */
+          for (i = 0 ; i < MAX_CAPTURE_SIZE; i++) {
+            logicdata[i] = 0;
+          }
+          /*
        * depending on the sample rate we need to delay in microseconds
-       * or milliseconds.  We can't do the complex trigger at 1MHz
-       * so in that case (delayTime == 1 and triggers enabled) use
-       * captureMicro() instead of triggerMicro().
-       */
-      if (useMicro) {
-        if (trigger && (delayTime != 1)) {
-          triggerMicro();
-        } 
-        else {
-          captureMicro();
-        }
-      } 
-      else {
-        captureMilli();
-      }
-      break;
-    case SUMP_TRIGGER_MASK:
-      /*
+           * or milliseconds.  We can't do the complex trigger at 1MHz
+           * so in that case (delayTime == 1 and triggers enabled) use
+           * captureMicro() instead of triggerMicro().
+           */
+          if (useMicro) {
+            if (trigger && (delayTime != 1)) {
+              triggerMicro();
+            } 
+            else {
+              captureMicro();
+            }
+          } 
+          else {
+            captureMilli();
+          }
+          break;
+        case SUMP_TRIGGER_MASK:
+          /*
        * the trigger mask byte has a '1' for each enabled trigger so
-       * we can just use it directly as our trigger mask.
-       */
-      getCmd();
+           * we can just use it directly as our trigger mask.
+           */
+          getCmd();
 #ifdef USE_PORTD
-      trigger = cmdBytes[0] << 2;
+          trigger = cmdBytes[0] << 2;
 #else
-      trigger = cmdBytes[0];
+          trigger = cmdBytes[0];
 #endif
-      break;
-    case SUMP_TRIGGER_VALUES:
-      /*
+          break;
+        case SUMP_TRIGGER_VALUES:
+          /*
        * trigger_values can be used directly as the value of each bit
-       * defines whether we're looking for it to be high or low.
-       */
-      getCmd();
+           * defines whether we're looking for it to be high or low.
+           */
+          getCmd();
 #ifdef USE_PORTD
-      trigger_values = cmdBytes[0] << 2;
+          trigger_values = cmdBytes[0] << 2;
 #else
-      trigger_values = cmdBytes[0];
+          trigger_values = cmdBytes[0];
 #endif
-      break;
-    case SUMP_TRIGGER_CONFIG:
-      /* read the rest of the command bytes, but ignore them. */
-      getCmd();
-      break;
-    case SUMP_SET_DIVIDER:
-      /*
+          break;
+        case SUMP_TRIGGER_CONFIG:
+          /* read the rest of the command bytes, but ignore them. */
+          getCmd();
+          break;
+        case SUMP_SET_DIVIDER:
+          /*
        * the shifting needs to be done on the 32bit unsigned long variable
-       * so that << 16 doesn't end up as zero.
-       */
-      getCmd();
-      divider = cmdBytes[2];
-      divider = divider << 8;
-      divider += cmdBytes[1];
-      divider = divider << 8;
-      divider += cmdBytes[0];
-      setupDelay();
-      break;
-    case SUMP_SET_READ_DELAY_COUNT:
-      /*
+           * so that << 16 doesn't end up as zero.
+           */
+          getCmd();
+          divider = cmdBytes[2];
+          divider = divider << 8;
+          divider += cmdBytes[1];
+          divider = divider << 8;
+          divider += cmdBytes[0];
+          setupDelay();
+          break;
+        case SUMP_SET_READ_DELAY_COUNT:
+          /*
        * this just sets up how many samples there should be before
-       * and after the trigger fires.  The readCount is total samples
-       * to return and delayCount number of samples after the trigger.
-       * this sets the buffer splits like 0/100, 25/75, 50/50
-       * for example if readCount == delayCount then we should
-       * return all samples starting from the trigger point.
-       * if delayCount < readCount we return (readCount - delayCount) of
-       * samples from before the trigger fired.
-       */
-      getCmd();
-      readCount = 4 * (((cmdBytes[1] << 8) | cmdBytes[0]) + 1);
-      if (readCount > MAX_CAPTURE_SIZE)
-        readCount = MAX_CAPTURE_SIZE;
-      delayCount = 4 * (((cmdBytes[3] << 8) | cmdBytes[2]) + 1);
-      if (delayCount > MAX_CAPTURE_SIZE)
-        delayCount = MAX_CAPTURE_SIZE;
-      break;
-    case SUMP_SET_FLAGS:
-      /* read the rest of the command bytes and check if RLE is enabled. */
-      getCmd();
-      rleEnabled = ((cmdBytes[1] & B1000000) != 0);
-      break;
-    case SUMP_GET_METADATA:
-      /*
+           * and after the trigger fires.  The readCount is total samples
+           * to return and delayCount number of samples after the trigger.
+           * this sets the buffer splits like 0/100, 25/75, 50/50
+           * for example if readCount == delayCount then we should
+           * return all samples starting from the trigger point.
+           * if delayCount < readCount we return (readCount - delayCount) of
+           * samples from before the trigger fired.
+           */
+          getCmd();
+          readCount = 4 * (((cmdBytes[1] << 8) | cmdBytes[0]) + 1);
+          if (readCount > MAX_CAPTURE_SIZE)
+            readCount = MAX_CAPTURE_SIZE;
+          delayCount = 4 * (((cmdBytes[3] << 8) | cmdBytes[2]) + 1);
+          if (delayCount > MAX_CAPTURE_SIZE)
+            delayCount = MAX_CAPTURE_SIZE;
+          break;
+        case SUMP_SET_FLAGS:
+          /* read the rest of the command bytes and check if RLE is enabled. */
+          getCmd();
+          rleEnabled = ((cmdBytes[1] & B1000000) != 0);
+          break;
+        case SUMP_GET_METADATA:
+          /*
        * We return a description of our capabilities.
-       * Check the function's comments below.
-       */
-      get_metadata();
-      break;
-    case SUMP_SELF_TEST:
-      /* ignored. */
-      break;
+           * Check the function's comments below.
+           */
+          get_metadata();
+          break;
+        case SUMP_SELF_TEST:
+          /* ignored. */
+          break;
 #ifdef DEBUG
-      /*
+          /*
        * a couple of debug commands used during development.
-       */
-    case '0':
-      /*
+           */
+        case '0':
+          /*
        * This resets the debug buffer pointer, effectively clearing the
-       * previous commands out of the buffer. Clear the sample data as well.
-       * Just send a '0' from the Arduino IDE's Serial Monitor.
-       */
-      savecount=0;
-      for (i = 0 ; i < MAX_CAPTURE_SIZE; i++) {
-        logicdata[i] = 0;
-      }
-      break;
-    case '1':
-      /*
+           * previous commands out of the buffer. Clear the sample data as well.
+           * Just send a '0' from the Arduino IDE's Serial Monitor.
+           */
+          savecount=0;
+          for (i = 0 ; i < MAX_CAPTURE_SIZE; i++) {
+            logicdata[i] = 0;
+          }
+          break;
+        case '1':
+          /*
        * This is used to see what commands were sent to the device.
-       * you can use the Arduino serial monitor and send a '1' and get
-       * a debug printout.  useless except for development.
-       */
-      blinkled();
-      debugprint();
-      break;
-    case '2':
-      /*
+           * you can use the Arduino serial monitor and send a '1' and get
+           * a debug printout.  useless except for development.
+           */
+          blinkled();
+          debugprint();
+          break;
+        case '2':
+          /*
        * This dumps the sample data to the serial port.  Used for debugging.
-       */
-      debugdump();
-      break;
+           */
+          debugdump();
+          break;
 #endif /* DEBUG */
-    default:
-      /* ignore any unrecognized bytes. */
-      break;
-    }
-  }
+        default:
+          /* ignore any unrecognized bytes. */
+          break;
+        } /* switch */
+      } /* if client.available() */
+    } /* while */
+    delay(1);
+    client.stop();
+    Serial.println("client disconnected?");
+  } /* if client */
 }
 
 void blinkled() {
@@ -424,10 +473,10 @@ void blinkled() {
  */
 void getCmd() {
   delay(10);
-  cmdBytes[0] = Serial.read();
-  cmdBytes[1] = Serial.read();
-  cmdBytes[2] = Serial.read();
-  cmdBytes[3] = Serial.read();
+  cmdBytes[0] = client.read();
+  cmdBytes[1] = client.read();
+  cmdBytes[2] = client.read();
+  cmdBytes[3] = client.read();
 
 #ifdef DEBUG
   if (savecount < 120 ) {
@@ -546,9 +595,9 @@ void captureMicro() {
    */
   for (i = 0 ; i < readCount; i++) {
 #ifdef USE_PORTD
-    Serial.write(logicdata[i] >> 2);
+    client.write(logicdata[i] >> 2);
 #else
-    Serial.write(logicdata[i]);
+    client.write(logicdata[i]);
 #endif
   }
 }
@@ -621,9 +670,9 @@ void captureMilli() {
   }
   for (i = 0 ; i < readCount; i++) {
 #ifdef USE_PORTD
-    Serial.write(logicdata[i] >> 2);
+    client.write(logicdata[i] >> 2);
 #else
-    Serial.write(logicdata[i]);
+    client.write(logicdata[i]);
 #endif
   }
 }
@@ -813,9 +862,9 @@ void triggerMicro() {
       logicIndex = 0;
     }
 #ifdef USE_PORTD
-    Serial.write(logicdata[logicIndex++] >> 2);
+    client.write(logicdata[logicIndex++] >> 2);
 #else
-    Serial.write(logicdata[logicIndex++]);
+    client.write(logicdata[logicIndex++]);
 #endif
   }
 }
@@ -852,69 +901,69 @@ void setupDelay() {
  */
 void get_metadata() {
   /* device name */
-  Serial.write((uint8_t)0x01);
-  Serial.write('A');
-  Serial.write('G');
-  Serial.write('L');
-  Serial.write('A');
+  client.write((uint8_t)0x01);
+  client.write('A');
+  client.write('G');
+  client.write('L');
+  client.write('A');
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
-  Serial.write('M');
+  client.write('M');
 #endif /* Mega */
-  Serial.write('v');
-  Serial.write('0');
-  Serial.write((uint8_t)0x00);
+  client.write('v');
+  client.write('0');
+  client.write((uint8_t)0x00);
 
   /* firmware version */
-  Serial.write((uint8_t)0x02);
-  Serial.write('0');
-  Serial.write('.');
-  Serial.write('0');
-  Serial.write('9');
-  Serial.write((uint8_t)0x00);
+  client.write((uint8_t)0x02);
+  client.write('0');
+  client.write('.');
+  client.write('0');
+  client.write('9');
+  client.write((uint8_t)0x00);
 
   /* sample memory */
-  Serial.write((uint8_t)0x21);
-  Serial.write((uint8_t)0x00);
-  Serial.write((uint8_t)0x00);
+  client.write((uint8_t)0x21);
+  client.write((uint8_t)0x00);
+  client.write((uint8_t)0x00);
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
   /* 7168 bytes */
-  Serial.write((uint8_t)0x1C);
-  Serial.write((uint8_t)0x00);
+  client.write((uint8_t)0x1C);
+  client.write((uint8_t)0x00);
 #elif defined(__AVR_ATmega328P__)
   /* 1024 bytes */
-  Serial.write((uint8_t)0x04);
-  Serial.write((uint8_t)0x00);
+  client.write((uint8_t)0x04);
+  client.write((uint8_t)0x00);
 #else
   /* 532 bytes */
-  Serial.write((uint8_t)0x02);
-  Serial.write((uint8_t)0x14);
+  client.write((uint8_t)0x02);
+  client.write((uint8_t)0x14);
 #endif /* Mega */
 
   /* sample rate (1MHz) */
-  Serial.write((uint8_t)0x23);
-  Serial.write((uint8_t)0x00);
-  Serial.write((uint8_t)0x0F);
-  Serial.write((uint8_t)0x42);
-  Serial.write((uint8_t)0x40);
+  client.write((uint8_t)0x23);
+  client.write((uint8_t)0x00);
+  client.write((uint8_t)0x0F);
+  client.write((uint8_t)0x42);
+  client.write((uint8_t)0x40);
 
   /* number of probes (6 by default on Arduino, 8 on Mega) */
-  Serial.write((uint8_t)0x40);
+  client.write((uint8_t)0x40);
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
-  Serial.write((uint8_t)0x08);
+  client.write((uint8_t)0x08);
 #else
 #ifdef CHAN5
-  Serial.write((uint8_t)0x06);
+  client.write((uint8_t)0x06);
 #else
-  Serial.write((uint8_t)0x05);
+  client.write((uint8_t)0x05);
 #endif /* CHAN5 */
 #endif /* Mega */
 
   /* protocol version (2) */
-  Serial.write((uint8_t)0x41);
-  Serial.write((uint8_t)0x02);
+  client.write((uint8_t)0x41);
+  client.write((uint8_t)0x02);
 
   /* end of data */
-  Serial.write((uint8_t)0x00);  
+  client.write((uint8_t)0x00);  
 }
 
 /*
@@ -927,36 +976,36 @@ void debugprint() {
   int i;
 
 #if 0
-  Serial.print("divider = ");
-  Serial.println(divider, DEC);
-  Serial.print("delayTime = ");
-  Serial.println(delayTime, DEC);
-  Serial.print("trigger_values = ");
-  Serial.println(trigger_values, BIN);
+  client.print("divider = ");
+  client.println(divider, DEC);
+  client.print("delayTime = ");
+  client.println(delayTime, DEC);
+  client.print("trigger_values = ");
+  client.println(trigger_values, BIN);
 #endif
-  Serial.print("readCount = ");
-  Serial.println(readCount, DEC);
-  Serial.print("delayCount = ");
-  Serial.println(delayCount, DEC);
-  Serial.print("logicIndex = ");
-  Serial.println(logicIndex, DEC);
-  Serial.print("triggerIndex = ");
-  Serial.println(triggerIndex, DEC);
-  Serial.print("rleEnabled = ");
-  Serial.println(rleEnabled, DEC);
+  client.print("readCount = ");
+  client.println(readCount, DEC);
+  client.print("delayCount = ");
+  client.println(delayCount, DEC);
+  client.print("logicIndex = ");
+  client.println(logicIndex, DEC);
+  client.print("triggerIndex = ");
+  client.println(triggerIndex, DEC);
+  client.print("rleEnabled = ");
+  client.println(rleEnabled, DEC);
 
-  Serial.println("Bytes:");
+  client.println("Bytes:");
 
   for (i = 0 ; i < savecount; i++) {
     if (savebytes[i] == 0x20) {
-      Serial.println();
+      client.println();
     } 
     else {
-      Serial.print(savebytes[i], HEX);
-      Serial.write(' ');
+      client.print(savebytes[i], HEX);
+      client.write(' ');
     }
   }
-  Serial.println("done...");
+  client.println("done...");
 }
 
 /*
@@ -967,23 +1016,24 @@ void debugdump() {
   int i;
   int j = 1;
 
-  Serial.print("\r\n");
+  client.print("\r\n");
 
   for (i = 0 ; i < MAX_CAPTURE_SIZE; i++) {
 #ifdef USE_PORTD
-    Serial.print(logicdata[i] >> 2, HEX);
+    client.print(logicdata[i] >> 2, HEX);
 #else
-    Serial.print(logicdata[i], HEX);
+    client.print(logicdata[i], HEX);
 #endif
-    Serial.print(" ");
+    client.print(" ");
     if (j == 32) {
-      Serial.print("\r\n");
+      client.print("\r\n");
       j = 0;
     }
     j++;
   }
 }
 #endif /* DEBUG */
+
 
 
 
