@@ -29,7 +29,7 @@
  */
 
 /*
- * NOTE: v0.09 switches the channels BACK to pins 8-13 for trigger reliability.
+ * NOTE: v0.09 switched the channels BACK to pins 8-13 for trigger reliability.
  *       Please report any issues.  Uncomment USE_PORTD for pins 2-7.
  *
  * This Arduino sketch implements a SUMP protocol compatible with the standard
@@ -78,7 +78,7 @@
  * until after the trigger fires.
  * Please try it out and report back.
  *
- * Release: v0.09 June 22, 2013.
+ * Release: v0.10 July 22, 2013.
  *
  */
 
@@ -868,8 +868,8 @@ void get_metadata() {
   Serial.write((uint8_t)0x02);
   Serial.write('0');
   Serial.write('.');
+  Serial.write('1');
   Serial.write('0');
-  Serial.write('9');
   Serial.write((uint8_t)0x00);
 
   /* sample memory */

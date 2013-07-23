@@ -1,7 +1,7 @@
 SUMP compatible logic analyzer for Arduino
 ==========================================
 
-NOTE: NOTE: v0.09 switches the channels BACK to pins 8-13 for trigger reliability.
+NOTE: NOTE: v0.09 switched the channels BACK to pins 8-13 for trigger reliability.
       Please report any issues.  Uncomment USE_PORTD for pins 2-7.
 
 This Arduino sketch implements a SUMP protocol compatible with the standard
@@ -54,5 +54,5 @@ Please try it out and report back.
 This master branch now supports Arduino 1.0 only.
 Checkout branch logic_analyzer_v0_5 for Arduino 22 support.
 
-Release: v0.09 June 22, 2013.
+Release: v0.10 July 22, 2013.
 
