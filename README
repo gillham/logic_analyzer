@@ -1,7 +1,13 @@
 SUMP compatible logic analyzer for Arduino
 ==========================================
 
-NOTE: NOTE: v0.09 switched the channels BACK to pins 8-13 for trigger reliability.
+NOTE: With v0.11 you can now sample at 4MHz & 2MHz rates in addition to the 
+      previous 1MHz and lower rates.  This is done via unrolled loops which
+      makes the source code huge but also the binary takes much more of the flash.
+      v0.11 is just slightly to big for an ATmega168's flash.  You can comment
+      out either captureInline2mhz() or captureInline4mhz() and it will fit. 
+
+NOTE: v0.09 switched the channels BACK to pins 8-13 for trigger reliability.
       Please report any issues.  Uncomment USE_PORTD for pins 2-7.
 
 This Arduino sketch implements a SUMP protocol compatible with the standard
@@ -37,7 +43,7 @@ platform, but on the mac it is here by default:
 To use this with the original or alternative SUMP clients,
 use these settings:
 
-Sampling rate: 1MHz (or lower)
+Sampling rate: 4MHz (or lower)
 Channel Groups: 0 (zero) only
 Recording Size:
    ATmega168:  532 (or lower)
