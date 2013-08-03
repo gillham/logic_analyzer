@@ -516,6 +516,7 @@ void captureMicro() {
    * Arduino digital pin 8 is being used here.
    */
   DEBUG_ENABLE;
+#ifdef DEBUG
   DEBUG_ON;
   delayMicroseconds(20);
   DEBUG_OFF;
@@ -524,6 +525,7 @@ void captureMicro() {
   delayMicroseconds(20);
   DEBUG_OFF;
   delayMicroseconds(20);
+#endif
 
   if (delayTime == 1) {
     /*
@@ -691,6 +693,7 @@ void triggerMicro() {
    * Arduino digital pin 8 is being used here.
    */
   DEBUG_ENABLE;
+#ifdef DEBUG
   DEBUG_ON;
   delayMicroseconds(20);
   DEBUG_OFF;
@@ -699,6 +702,7 @@ void triggerMicro() {
   delayMicroseconds(20);
   DEBUG_OFF;
   delayMicroseconds(20);
+#endif
 
   if (delayTime == 1) {
     /*
@@ -1018,6 +1022,8 @@ void debugdump() {
   }
 }
 #endif /* DEBUG */
+
+
 
 
 
