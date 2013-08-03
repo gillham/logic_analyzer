@@ -63,7 +63,7 @@
  * To use this with the original or alternative SUMP clients,
  * use these settings:
  * 
- * Sampling rate: 1MHz (or lower)
+ * Sampling rate: 4MHz (or lower)
  * Channel Groups: 0 (zero) only
  * Recording Size:
  *    ATmega168:  532 (or lower)
@@ -78,7 +78,7 @@
  * until after the trigger fires.
  * Please try it out and report back.
  *
- * Release: v0.10 July 22, 2013.
+ * Release: v0.11 August 3, 2013.
  *
  */
 
@@ -246,6 +246,31 @@ void setup()
   pinMode(ledPin, OUTPUT);
 #endif
 #endif /* Mega */
+
+#if 0
+
+  /*
+   * This sets up timer2 at 100KHz to toggle a pin.  This is useful
+   * for debugging as it gives an internally precise signal source.
+   * This doesn't work on the Arduino Mega.  Use on the Uno or older.
+   * We're using the same clock source for the timer & our sampling.
+   */
+
+  /* Set OC2A (digital pin 11) to output so we can toggle it. */
+  pinMode(11, OUTPUT);
+
+  /* reset timer to zero */
+  TCNT2 = 0;
+  TCCR2A = 0;
+  TCCR2B = 0;
+  OCR2A = 0;
+
+  /* Set CTC mode and toggle on compare. */
+  TCCR2A = _BV (COM2A0) | _BV (WGM21);
+  /* 79 = 100KHz, 15 = 500KHz, 7 = 1MHz */
+  OCR2A = 79;
+  TCCR2B = _BV (CS20);
+#endif
 }
 
 void loop()
@@ -283,7 +308,16 @@ void loop()
        * so in that case (delayTime == 1 and triggers enabled) use
        * captureMicro() instead of triggerMicro().
        */
-      if (useMicro) {
+
+      if (divider == 24) {
+        /* 4.0MHz */
+        captureInline4mhz();
+      } 
+      else if (divider == 49) {
+        /* 2.0MHz */
+        captureInline2mhz();
+      } 
+      else if (useMicro) {
         if (trigger && (delayTime != 1)) {
           triggerMicro();
         } 
@@ -457,7 +491,7 @@ void getCmd() {
  */
 
 void captureMicro() {
-  int i;
+  unsigned int i;
 
   /*
    * basic trigger, wait until all trigger conditions are met on port.
@@ -571,7 +605,7 @@ void captureMicro() {
  * this basic functionality.
  */
 void captureMilli() {
-  int i = 0;
+  unsigned int i = 0;
 
   if(rleEnabled) {
     /*
@@ -637,7 +671,7 @@ void captureMilli() {
  * 
  */
 void triggerMicro() {
-  int i = 0;
+  unsigned int i = 0;
 
   logicIndex = 0;
   triggerIndex = 0;
@@ -869,7 +903,7 @@ void get_metadata() {
   Serial.write('0');
   Serial.write('.');
   Serial.write('1');
-  Serial.write('0');
+  Serial.write('1');
   Serial.write((uint8_t)0x00);
 
   /* sample memory */
@@ -890,12 +924,12 @@ void get_metadata() {
   Serial.write((uint8_t)0x14);
 #endif /* Mega */
 
-  /* sample rate (1MHz) */
+  /* sample rate (4MHz) */
   Serial.write((uint8_t)0x23);
   Serial.write((uint8_t)0x00);
-  Serial.write((uint8_t)0x0F);
-  Serial.write((uint8_t)0x42);
-  Serial.write((uint8_t)0x40);
+  Serial.write((uint8_t)0x3D);
+  Serial.write((uint8_t)0x09);
+  Serial.write((uint8_t)0x00);
 
   /* number of probes (6 by default on Arduino, 8 on Mega) */
   Serial.write((uint8_t)0x40);
@@ -984,6 +1018,8 @@ void debugdump() {
   }
 }
 #endif /* DEBUG */
+
+
 
 
 
