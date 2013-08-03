@@ -3,7 +3,7 @@ SUMP compatible logic analyzer for Arduino
 
 NOTE: With v0.11 you can now sample at 4MHz & 2MHz rates in addition to the 
       previous 1MHz and lower rates.  This is done via unrolled loops which
-      makes the source code huge but also the binary takes much more of the flash.
+      makes the source code huge and the binary takes much more of the flash.
       v0.11 is just slightly to big for an ATmega168's flash.  You can comment
       out either captureInline2mhz() or captureInline4mhz() and it will fit. 
 
