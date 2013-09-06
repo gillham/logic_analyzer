@@ -1154,7 +1154,7 @@ void captureInline4mhz() {
   INLINE_NOP;
   logicdata[531] = CHANPIN;
   INLINE_NOP;
-#if defined(__AVR_ATmega328P__)
+#if defined(__AVR_ATmega328P__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
   logicdata[532] = CHANPIN;
   INLINE_NOP;
   logicdata[533] = CHANPIN;
@@ -2139,7 +2139,8 @@ void captureInline4mhz() {
   INLINE_NOP;
   logicdata[1023] = CHANPIN;
   INLINE_NOP;
-#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) 
+#endif
+#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) 
   logicdata[1024] = CHANPIN;
   INLINE_NOP;
   logicdata[1025] = CHANPIN;

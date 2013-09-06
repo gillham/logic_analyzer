@@ -78,7 +78,7 @@
  * until after the trigger fires.
  * Please try it out and report back.
  *
- * Release: v0.11 August 3, 2013.
+ * Release: v0.12 September 6, 2013.
  *
  */
 
@@ -907,7 +907,7 @@ void get_metadata() {
   Serial.write('0');
   Serial.write('.');
   Serial.write('1');
-  Serial.write('1');
+  Serial.write('2');
   Serial.write((uint8_t)0x00);
 
   /* sample memory */
