@@ -47,7 +47,7 @@
  * To use this with the original or alternative SUMP clients,
  * use these settings:
  * 
- * Sampling rate: 4MHz (or lower)
+ * Sampling rate: 4MHz (or lower) (no 2MHz on ATmega168)
  * Channel Groups: 0 (zero) only
  * Recording Size:
  *    ATmega168:  532 (or lower)
@@ -299,7 +299,9 @@ void loop()
       } 
       else if (divider == 49) {
         /* 2.0MHz */
+#if defined(__AVR_ATmega168P__)
         captureInline2mhz();
+#endif
       } 
       else if (useMicro) {
         if (trigger && (delayTime != 1)) {

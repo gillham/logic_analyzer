@@ -21,7 +21,7 @@ Pins 22-29 (Port A) are used by default.
 To use this with the original or alternative SUMP clients,
 use these settings:
 
-Sampling rate: 4MHz (or lower)
+Sampling rate: 4MHz (or lower) (no 2MHz on ATmega168)
 Channel Groups: 0 (zero) only
 Recording Size:
    ATmega168:  532 (or lower)
