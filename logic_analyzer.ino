@@ -2,7 +2,7 @@
  *
  * SUMP Protocol Implementation for Arduino boards.
  *
- * Copyright (c) 2011,2012,2013 Andrew Gillham
+ * Copyright (c) 2011,2012,2013,2014 Andrew Gillham
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,22 +43,6 @@
  * On the Arduino Mega board 8 channels are supported and 7k of samples.
  * Pins 22-29 (Port A) are used by default, you can change the 'CHANPIN' below
  * if something else works better for you.
- *
- * NOTE:
- * If you are using the original SUMP client, or using the alternative client
- * without the device profiles, then you will get a "device not found" error.
- * You must DISABLE the Arduino auto reset feature to use this logic analyzer
- * code. There are various methods to do this, some boards have a jumper,
- * others require you to cut a trace.  You may also install a *precisely*
- * 120 Ohm resistor between the reset & 5V piins.  Make sure it is really
- * 120 Ohm or you may damage your board.
- * It is much easier to use the alternative SUMP client from here:
- *      http://www.lxtreme.nl/ols/
- *
- * The device profiles should be included with this code.  Copy them to the
- * 'plugins' directory of the client.  The location varies depending on the
- * platform, but on the mac it is here by default:
- * /Applications/LogicSniffer.app/Contents/Resources/Java/plugins
  *
  * To use this with the original or alternative SUMP clients,
  * use these settings:
