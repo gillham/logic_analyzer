@@ -5,13 +5,14 @@ This Arduino sketch implements a SUMP protocol compatible with the standard
 SUMP client as well as the alternative client from here:
 	http://www.lxtreme.nl/ols/
 
-The alternative client version is highly recommended.  Download version "ols-0.9.7"
-or newer for built-in device profiles.
+The alternative client version is highly recommended.  Download version
+"ols-0.9.7" or newer for built-in device profiles.
 
 This SUMP protocol compatible logic analyzer for the Arduino board supports
 5 channels consisting of digital pins 8-12, which are the first 5 bits (0-4)
 of PORTB. Arduino pin 13 / bit 5 is the Arduino LED, bits 6 & 7 are the
 crystal oscillator pins.
+
 Uncomment CHAN5 below if you want to use the LED pin as an input and have
 6 channels.
 
@@ -41,7 +42,8 @@ NOTE: With v0.11 you can now sample at 4MHz & 2MHz rates in addition to the
       previous 1MHz and lower rates.  This is done via unrolled loops which
       makes the source code huge and the binary takes much more of the flash.
       v0.11 is just slightly to big for an ATmega168's flash.  You can comment
-      out either captureInline2mhz() or captureInline4mhz() and it will fit. 
+      out either captureInline2mhz() or captureInline4mhz() and it will fit.
+      [ The code automatically skips the 2MHz code now, this isn't needed. ]
 
 NOTE: v0.09 switched the channels BACK to pins 8-13 for trigger reliability.
       Please report any issues.  Uncomment USE_PORTD for pins 2-7.
@@ -50,7 +52,7 @@ NOTE: The device profiles should be included with this code.  Copy them to the
       'plugins' directory of the client.  The location varies depending on the
       platform, but on the mac it is here by default:
       /Applications/LogicSniffer.app/Contents/Resources/Java/plugins
-      [ These are already included in ols-0.9.7 or newer so do not copy them. ]
+      [ These are included in ols-0.9.7 or newer so do not copy them. ]
 
 NOTE: If you are using the original SUMP client, then you will get a
       "device not found" error.
@@ -60,8 +62,8 @@ NOTE: If you are using the original SUMP client, then you will get a
       120 Ohm resistor between the reset & 5V piins.  Make sure it is really
       120 Ohm or you may damage your board.  It is much easier to use the
       alternative SUMP client referenced above.
-      [ This is no longer needed for the general case and is just here for reference. ]
-      [ DO NOT use this resistor unless absolutely necessary due to very old clients. ]
+      [ This is not needed with ols-0.9.7 or newer. ]
+      [ DO NOT use this resistor unless absolutely necessary on old clients. ]
 
 NOTE: This master branch now supports Arduino 1.0 only.
       Checkout branch logic_analyzer_v0_5 for Arduino 22 support.
