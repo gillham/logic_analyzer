@@ -114,6 +114,15 @@ void debugdump(void);
 #define CHAN5 7
 #else
 #define CHANPIN PINB
+#if defined(__AVR_ATmega32U4__)
+#define CHAN0 SCK
+#define CHAN1 MOSI
+#define CHAN2 MISO
+#define CHAN3 8
+#define CHAN4 9
+#define CHAN5 10
+#define CHAN6 11
+#else
 #define CHAN0 8
 #define CHAN1 9
 #define CHAN2 10
@@ -121,8 +130,9 @@ void debugdump(void);
 #define CHAN4 12
 /* Comment out CHAN5 if you don't want to use the LED pin for an input */
 #define CHAN5 13
+#endif /* AVR_ATmega32U4 */
 #endif /* USE_PORTD */
-#endif
+#endif /* Mega1280 or Mega2560 */
 #define ledPin 13
 
 /* XON/XOFF are not supported. */
@@ -154,6 +164,9 @@ void debugdump(void);
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
 #define DEBUG_CAPTURE_SIZE 7168
 #define CAPTURE_SIZE 7168
+#elif defined(__AVR_ATmega32U4__)
+#define DEBUG_CAPTURE_SIZE 1536
+#define CAPTURE_SIZE 1536
 #elif defined(__AVR_ATmega328P__)
 #define DEBUG_CAPTURE_SIZE 1024
 #define CAPTURE_SIZE 1024
@@ -205,6 +218,10 @@ boolean rleEnabled = 0;
 void setup()
 {
   Serial.begin(115200);
+  while (!Serial) {
+    ; // wait for serial port to connect. Needed for Leonardo only
+  }
+
 
   /*
    * set debug pin (digital pin 8) to output right away so it settles.
@@ -222,14 +239,15 @@ void setup()
 #ifdef CHAN5
   pinMode(CHAN5, INPUT);
 #endif
-#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+#ifdef CHAN6
   pinMode(CHAN6, INPUT);
+#endif
+#ifdef CHAN7
   pinMode(CHAN7, INPUT);
-#else
+#endif
 #ifndef CHAN5
   pinMode(ledPin, OUTPUT);
 #endif
-#endif /* Mega */
 
 #if 0
 
@@ -883,6 +901,8 @@ void get_metadata() {
   Serial.write('A');
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
   Serial.write('M');
+#elif defined(__AVR_ATmega32U4__)
+  Serial.write('L');
 #endif /* Mega */
   Serial.write('v');
   Serial.write('0');
@@ -904,6 +924,10 @@ void get_metadata() {
   /* 7168 bytes */
   Serial.write((uint8_t)0x1C);
   Serial.write((uint8_t)0x00);
+#elif defined(__AVR_ATmega32U4__)
+  /* 1024 bytes */
+  Serial.write((uint8_t)0x04);
+  Serial.write((uint8_t)0x00);
 #elif defined(__AVR_ATmega328P__)
   /* 1024 bytes */
   Serial.write((uint8_t)0x04);
@@ -923,15 +947,15 @@ void get_metadata() {
 
   /* number of probes (6 by default on Arduino, 8 on Mega) */
   Serial.write((uint8_t)0x40);
-#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+#ifdef CHAN7
   Serial.write((uint8_t)0x08);
-#else
-#ifdef CHAN5
+#elif CHAN6
+  Serial.write((uint8_t)0x07);
+#elif CHAN5
   Serial.write((uint8_t)0x06);
 #else
   Serial.write((uint8_t)0x05);
-#endif /* CHAN5 */
-#endif /* Mega */
+#endif
 
   /* protocol version (2) */
   Serial.write((uint8_t)0x41);
@@ -1008,6 +1032,8 @@ void debugdump() {
   }
 }
 #endif /* DEBUG */
+
+
 
 
 
