@@ -88,6 +88,11 @@ void debugdump(void);
  * PORTD support with triggers seems to work but needs more testing.
  */
 //#define USE_PORTD 1
+#if defined(USE_PORTD)
+#define SHIFTBITS 2
+#elif defined(__AVR_ATmega32U4__)
+#define SHIFTBITS 1
+#endif
 
 /*
  * Arduino device profile:      ols.profile-agla.cfg
@@ -339,8 +344,8 @@ void loop()
        * we can just use it directly as our trigger mask.
        */
       getCmd();
-#ifdef USE_PORTD
-      trigger = cmdBytes[0] << 2;
+#ifdef SHIFTBITS
+      trigger = cmdBytes[0] << SHIFTBITS;
 #else
       trigger = cmdBytes[0];
 #endif
@@ -351,8 +356,8 @@ void loop()
        * defines whether we're looking for it to be high or low.
        */
       getCmd();
-#ifdef USE_PORTD
-      trigger_values = cmdBytes[0] << 2;
+#ifdef SHIFTBITS
+      trigger_values = cmdBytes[0] << SHIFTBITS;
 #else
       trigger_values = cmdBytes[0];
 #endif
@@ -585,8 +590,8 @@ void captureMicro() {
    * is done for any triggers, this is effectively the 0/100 buffer split.
    */
   for (i = 0 ; i < readCount; i++) {
-#ifdef USE_PORTD
-    Serial.write(logicdata[i] >> 2);
+#ifdef SHIFTBITS
+    Serial.write(logicdata[i] >> SHIFTBITS);
 #else
     Serial.write(logicdata[i]);
 #endif
@@ -660,8 +665,8 @@ void captureMilli() {
     }
   }
   for (i = 0 ; i < readCount; i++) {
-#ifdef USE_PORTD
-    Serial.write(logicdata[i] >> 2);
+#ifdef SHIFTBITS
+    Serial.write(logicdata[i] >> SHIFTBITS);
 #else
     Serial.write(logicdata[i]);
 #endif
@@ -854,8 +859,8 @@ void triggerMicro() {
     if (logicIndex >= readCount) {
       logicIndex = 0;
     }
-#ifdef USE_PORTD
-    Serial.write(logicdata[logicIndex++] >> 2);
+#ifdef SHIFTBITS
+    Serial.write(logicdata[logicIndex++] >> SHIFTBITS);
 #else
     Serial.write(logicdata[logicIndex++]);
 #endif
@@ -1018,8 +1023,8 @@ void debugdump() {
   Serial.print("\r\n");
 
   for (i = 0 ; i < MAX_CAPTURE_SIZE; i++) {
-#ifdef USE_PORTD
-    Serial.print(logicdata[i] >> 2, HEX);
+#ifdef SHIFTBITS
+    Serial.print(logicdata[i] >> SHIFTBITS, HEX);
 #else
     Serial.print(logicdata[i], HEX);
 #endif
