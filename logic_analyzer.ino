@@ -2,7 +2,7 @@
  *
  * SUMP Protocol Implementation for Arduino boards.
  *
- * Copyright (c) 2011,2012,2013,2014 Andrew Gillham
+ * Copyright (c) 2011,2012,2013,2014,2015 Andrew Gillham
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@
  *
  * To use this with the original or alternative SUMP clients,
  * use these settings:
- * 
+ *
  * Sampling rate: 4MHz (or lower) (no 2MHz on ATmega168)
  * Channel Groups: 0 (zero) only
  * Recording Size:
@@ -62,7 +62,7 @@
  * until after the trigger fires.
  * Please try it out and report back.
  *
- * Release: v0.12 September 6, 2013.
+ * Release: v0.13 February 7, 2015.
  *
  */
 
@@ -81,6 +81,7 @@ void blinkled(void);
 void get_metadata(void);
 void debugprint(void);
 void debugdump(void);
+void prettydump(void);
 
 
 /*
@@ -170,7 +171,7 @@ void debugdump(void);
 #define DEBUG_ENABLE DDRD = DDRD | B10000000
 #define DEBUG_ON PORTD = B10000000
 #define DEBUG_OFF PORTD = B00000000
-#endif
+#endif /* USE_PORTD */
 #define DEBUG
 #ifdef DEBUG
 #define MAX_CAPTURE_SIZE DEBUG_CAPTURE_SIZE
@@ -263,10 +264,10 @@ void loop()
 
   if (Serial.available() > 0) {
     cmdByte = Serial.read();
-    switch(cmdByte) {
+    switch (cmdByte) {
     case SUMP_RESET:
       /*
-       * We don't do anything here as some unsupported extended commands have
+         * We don't do anything here as some unsupported extended commands have
        * zero bytes and are mistaken as resets.  This can trigger false resets
        * so we don't erase the data or do anything for a reset.
        */
@@ -280,14 +281,14 @@ void loop()
       break;
     case SUMP_ARM:
       /*
-       * Zero out any previous samples before arming.
+         * Zero out any previous samples before arming.
        * Done here instead via reset due to spurious resets.
        */
       for (i = 0 ; i < MAX_CAPTURE_SIZE; i++) {
         logicdata[i] = 0;
       }
       /*
-       * depending on the sample rate we need to delay in microseconds
+         * depending on the sample rate we need to delay in microseconds
        * or milliseconds.  We can't do the complex trigger at 1MHz
        * so in that case (delayTime == 1 and triggers enabled) use
        * captureMicro() instead of triggerMicro().
@@ -296,28 +297,28 @@ void loop()
       if (divider == 24) {
         /* 4.0MHz */
         captureInline4mhz();
-      } 
+      }
       else if (divider == 49) {
         /* 2.0MHz */
-#if defined(__AVR_ATmega168P__)
+#if !defined(__AVR_ATmega168__)
         captureInline2mhz();
 #endif
-      } 
+      }
       else if (useMicro) {
         if (trigger && (delayTime != 1)) {
           triggerMicro();
-        } 
+        }
         else {
           captureMicro();
         }
-      } 
+      }
       else {
         captureMilli();
       }
       break;
     case SUMP_TRIGGER_MASK:
       /*
-       * the trigger mask byte has a '1' for each enabled trigger so
+         * the trigger mask byte has a '1' for each enabled trigger so
        * we can just use it directly as our trigger mask.
        */
       getCmd();
@@ -329,7 +330,7 @@ void loop()
       break;
     case SUMP_TRIGGER_VALUES:
       /*
-       * trigger_values can be used directly as the value of each bit
+         * trigger_values can be used directly as the value of each bit
        * defines whether we're looking for it to be high or low.
        */
       getCmd();
@@ -345,7 +346,7 @@ void loop()
       break;
     case SUMP_SET_DIVIDER:
       /*
-       * the shifting needs to be done on the 32bit unsigned long variable
+         * the shifting needs to be done on the 32bit unsigned long variable
        * so that << 16 doesn't end up as zero.
        */
       getCmd();
@@ -358,7 +359,7 @@ void loop()
       break;
     case SUMP_SET_READ_DELAY_COUNT:
       /*
-       * this just sets up how many samples there should be before
+         * this just sets up how many samples there should be before
        * and after the trigger fires.  The readCount is total samples
        * to return and delayCount number of samples after the trigger.
        * this sets the buffer splits like 0/100, 25/75, 50/50
@@ -382,7 +383,7 @@ void loop()
       break;
     case SUMP_GET_METADATA:
       /*
-       * We return a description of our capabilities.
+         * We return a description of our capabilities.
        * Check the function's comments below.
        */
       get_metadata();
@@ -392,22 +393,32 @@ void loop()
       break;
 #ifdef DEBUG
       /*
-       * a couple of debug commands used during development.
+         * a couple of debug commands used during development.
        */
+    case '?':
+      Serial.println("");
+      Serial.println("0 = clear cmd buffer");
+      Serial.println("1 = print cmd buffer");
+      Serial.println("2 = print data buffer");
+      Serial.println("3 = pretty print buffer");
+      Serial.println("4 = capture at 4MHz");
+      Serial.println("5 = capture at 1MHz");
+      Serial.println("6 = capture at 500KHz");
+      break;
     case '0':
       /*
-       * This resets the debug buffer pointer, effectively clearing the
+         * This resets the debug buffer pointer, effectively clearing the
        * previous commands out of the buffer. Clear the sample data as well.
        * Just send a '0' from the Arduino IDE's Serial Monitor.
        */
-      savecount=0;
+      savecount = 0;
       for (i = 0 ; i < MAX_CAPTURE_SIZE; i++) {
         logicdata[i] = 0;
       }
       break;
     case '1':
       /*
-       * This is used to see what commands were sent to the device.
+         * This is used to see what commands were sent to the device.
        * you can use the Arduino serial monitor and send a '1' and get
        * a debug printout.  useless except for development.
        */
@@ -416,9 +427,43 @@ void loop()
       break;
     case '2':
       /*
-       * This dumps the sample data to the serial port.  Used for debugging.
+         * This dumps the sample data to the serial port.
        */
       debugdump();
+      break;
+    case '3':
+      /*
+         * Prints a visual representation of the data buffer.
+       */
+      prettydump();
+      break;
+    case '4':
+      /*
+         * This runs a sample capture at 4MHz.
+       */
+      captureInline4mhz();
+      Serial.println("");
+      Serial.println("4MHz capture done.");
+      break;
+    case '5':
+      /*
+         * This runs a sample capture at 1MHz.
+       * delayTime = 1ms for 1MHz sampling.
+       */
+      delayTime = 1;
+      captureMicro();
+      Serial.println("");
+      Serial.println("1MHz capture done.");
+      break;
+    case '6':
+      /*
+         * This runs a sample capture at 500KHz.
+       * delayTime = 2ms for 500KHz.
+       */
+      delayTime = 1;
+      captureMicro();
+      Serial.println("");
+      Serial.println("500KHz capture done.");
       break;
 #endif /* DEBUG */
     default:
@@ -525,7 +570,7 @@ void captureMicro() {
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
     }
     DEBUG_OFF; /* debug timing measurement */
-  } 
+  }
   else if (delayTime == 2) {
     /*
      * 500KHz sample rate = 2 uS delay, still pretty fast so we pad this
@@ -542,7 +587,7 @@ void captureMicro() {
       __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
     }
     DEBUG_OFF; /* debug timing measurement */
-  } 
+  }
   else {
     /*
      * not 1MHz or 500KHz; delayMicroseconds(delay - 1) works fine here
@@ -595,7 +640,7 @@ void captureMicro() {
 void captureMilli() {
   unsigned int i = 0;
 
-  if(rleEnabled) {
+  if (rleEnabled) {
     /*
      * very basic trigger, just like in captureMicros() above.
      */
@@ -606,16 +651,16 @@ void captureMilli() {
     byte lastSample = 0;
     byte sampleCount = 0;
 
-    while(i < readCount) {
+    while (i < readCount) {
       /*
        * Implementation of the RLE unlimited protocol: timings might be off a little
        */
-      if(lastSample == (CHANPIN & B01111111) && sampleCount < 127) {
+      if (lastSample == (CHANPIN & B01111111) && sampleCount < 127) {
         sampleCount++;
         delay(delayTime);
         continue;
       }
-      if(sampleCount != 0) {
+      if (sampleCount != 0) {
         logicdata[i] = B10000000 | sampleCount;
         sampleCount = 0;
         i++;
@@ -627,7 +672,7 @@ void captureMilli() {
 
       i++;
     }
-  } 
+  }
   else {
     /*
      * very basic trigger, just like in captureMicros() above.
@@ -656,7 +701,7 @@ void captureMilli() {
  * This works ok at 500KHz and lower sample rates.  We don't have enough time
  * with a 16MHz clock to sample at 1MHz into the circular buffer.  A 20MHz
  * clock might be ok but all of the timings would have to be redone.
- * 
+ *
  */
 void triggerMicro() {
   unsigned int i = 0;
@@ -703,7 +748,7 @@ void triggerMicro() {
      * click stop.
      */
     return;
-  } 
+  }
   else if (delayTime == 2) {
     /*
      * 500KHz case.  We should be able to manage this in time.
@@ -732,7 +777,7 @@ void triggerMicro() {
     __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t");
     DEBUG_OFF; /* debug timing measurement */
 
-    /* 
+    /*
      * One sample size delay. ends up being 2 uS combined with assignment
      * below.  This padding is so we have a consistent timing interval
      * between the trigger point and the subsequent samples.
@@ -762,7 +807,7 @@ void triggerMicro() {
     }
     DEBUG_OFF; /* debug timing measurement */
     delayMicroseconds(100);
-  } 
+  }
   else {
     /*
      * Less than 500KHz case.  This uses delayMicroseconds() and some padding
@@ -862,7 +907,7 @@ void setupDelay() {
   if (divider >= 1500000) {
     useMicro = 0;
     delayTime = (divider + 1) / 100000;
-  } 
+  }
   else {
     useMicro = 1;
     delayTime = (divider + 1) / 100;
@@ -893,7 +938,7 @@ void get_metadata() {
   Serial.write('0');
   Serial.write('.');
   Serial.write('1');
-  Serial.write('2');
+  Serial.write('3');
   Serial.write((uint8_t)0x00);
 
   /* sample memory */
@@ -938,11 +983,11 @@ void get_metadata() {
   Serial.write((uint8_t)0x02);
 
   /* end of data */
-  Serial.write((uint8_t)0x00);  
+  Serial.write((uint8_t)0x00);
 }
 
 /*
- * This is used by the '0' debug command to dump the contents of some
+ * This is used by the '1' debug command to dump the contents of some
  * interesting variables and the debug buffer.
  *
  */
@@ -974,7 +1019,7 @@ void debugprint() {
   for (i = 0 ; i < savecount; i++) {
     if (savebytes[i] == 0x20) {
       Serial.println();
-    } 
+    }
     else {
       Serial.print(savebytes[i], HEX);
       Serial.write(' ');
@@ -1007,7 +1052,37 @@ void debugdump() {
     j++;
   }
 }
+
+/*
+ * This is used by the '3' debugs command to dump the first 64 bytes
+ * of the sample buffer.
+ * It prints the data in a graphical representation.
+ */
+void prettydump() {
+  int i;
+  byte j;
+  byte k;
+
+  Serial.print("\r\n");
+
+  for (i = 0 ; i < 64; i++) {
+#ifdef USE_PORTD
+    k = logicdata[i] >> 2;
+#else
+    k = logicdata[i];
+#endif
+    for (j = 0; j < 8; j++) {
+      if (k & 0x01)
+        Serial.print("| ");
+      else
+        Serial.print(" |");
+      k = k >> 1;
+    }
+    Serial.print("\r\n");
+  }
+}
 #endif /* DEBUG */
+
 
 
 
