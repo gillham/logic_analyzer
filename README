@@ -36,6 +36,17 @@ below 1MHz.  1MHz works for a basic busy wait trigger that doesn't store
 until after the trigger fires.
 Please try it out and report back.
 
+Debugging
+=========
+
+You can uncomment the '#define DEBUG_MENU' line to add some diagnostic menu
+options for capturing or dumping the capture buffer.
+You can uncomment the '#define DEBUG' and '#define DEBUG_MENU' for a couple
+extra menu options and logging of the received commands.  The DEBUG option
+is generally only useful for development, while the DEBUG_MENU option is
+good for troubleshooting when the logic_analyzer sketch isn't working for you.
+Both are disabled by default to conserve RAM for improved stability.
+
 Older Notes
 ===========================================================================
 NOTE: With v0.11 you can now sample at 4MHz & 2MHz rates in addition to the 
@@ -69,5 +80,5 @@ NOTE: This master branch now supports Arduino 1.0 only.
       Checkout branch logic_analyzer_v0_5 for Arduino 22 support.
 
 
-Release: v0.13 February 7, 2015.
+Release: v0.14 December 16, 2015.
 

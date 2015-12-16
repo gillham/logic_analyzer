@@ -62,7 +62,7 @@
  * until after the trigger fires.
  * Please try it out and report back.
  *
- * Release: v0.13 February 7, 2015.
+ * Release: v0.14 December 16, 2015.
  *
  */
 
@@ -172,7 +172,10 @@ void prettydump(void);
 #define DEBUG_ON PORTD = B10000000
 #define DEBUG_OFF PORTD = B00000000
 #endif /* USE_PORTD */
-#define DEBUG
+
+//#define DEBUG_MENU
+//#define DEBUG
+
 #ifdef DEBUG
 #define MAX_CAPTURE_SIZE DEBUG_CAPTURE_SIZE
 #else
@@ -391,20 +394,23 @@ void loop()
     case SUMP_SELF_TEST:
       /* ignored. */
       break;
-#ifdef DEBUG
+#ifdef DEBUG_MENU
       /*
          * a couple of debug commands used during development.
        */
     case '?':
       Serial.println("");
+#ifdef DEBUG
       Serial.println("0 = clear cmd buffer");
       Serial.println("1 = print cmd buffer");
+#endif /* DEBUG */
       Serial.println("2 = print data buffer");
       Serial.println("3 = pretty print buffer");
       Serial.println("4 = capture at 4MHz");
       Serial.println("5 = capture at 1MHz");
       Serial.println("6 = capture at 500KHz");
       break;
+#ifdef DEBUG
     case '0':
       /*
          * This resets the debug buffer pointer, effectively clearing the
@@ -425,6 +431,7 @@ void loop()
       blinkled();
       debugprint();
       break;
+#endif /* DEBUG */
     case '2':
       /*
          * This dumps the sample data to the serial port.
@@ -465,7 +472,7 @@ void loop()
       Serial.println("");
       Serial.println("500KHz capture done.");
       break;
-#endif /* DEBUG */
+#endif /* DEBUG_MENU */
     default:
       /* ignore any unrecognized bytes. */
       break;
@@ -1028,6 +1035,8 @@ void debugprint() {
   Serial.println("done...");
 }
 
+#endif /* DEBUG */
+#ifdef DEBUG_MENU
 /*
  * This is used by the '2' debug command to dump the contents
  * of the sample buffer.
@@ -1081,7 +1090,7 @@ void prettydump() {
     Serial.print("\r\n");
   }
 }
-#endif /* DEBUG */
+#endif /* DEBUG_MENU */
 
 
 
