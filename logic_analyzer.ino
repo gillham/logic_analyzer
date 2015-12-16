@@ -82,7 +82,8 @@ void get_metadata(void);
 void debugprint(void);
 void debugdump(void);
 void prettydump(void);
-
+void captureInline4mhz(void);
+void captureInline2mhz(void);
 
 /*
  * Should we use PORTD or PORTB?  (default is PORTB)

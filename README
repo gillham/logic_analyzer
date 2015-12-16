@@ -47,6 +47,24 @@ is generally only useful for development, while the DEBUG_MENU option is
 good for troubleshooting when the logic_analyzer sketch isn't working for you.
 Both are disabled by default to conserve RAM for improved stability.
 
+CLI compiling
+=============
+
+If you want to use the 'arduino-mk' package (on Debian for example ) to compile
+this using the Makefile, you'll need to make a couple of changes since the
+Makefile only supports a single .ino file.  Basically you just need to append
+the other two files to the main .ino and then remove them.
+
+$ cat logic_analyzer_inline_4mhz.ino >> logic_analyzer.ino
+$ cat logic_analyzer_inline_2mhz.ino >> logic_analyzer.ino
+$ rm logic_analyzer_inline_4mhz.ino logic_analyzer_inline_2mhz.ino
+$ make
+
+This will make GIT unhappy so if you need to revert it to run 'git pull' do
+this:
+$ git reset --hard origin/master
+
+
 Older Notes
 ===========================================================================
 NOTE: With v0.11 you can now sample at 4MHz & 2MHz rates in addition to the 
