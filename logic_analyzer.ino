@@ -156,6 +156,9 @@ void captureInline2mhz(void);
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
 #define DEBUG_CAPTURE_SIZE 7168
 #define CAPTURE_SIZE 7168
+#elif defined(__AVR_ATmega32U4__)
+#define DEBUG_CAPTURE_SIZE 2048
+#define CAPTURE_SIZE 2048
 #elif defined(__AVR_ATmega328P__)
 #define DEBUG_CAPTURE_SIZE 1024
 #define CAPTURE_SIZE 1024
