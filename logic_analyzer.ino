@@ -129,6 +129,7 @@ void captureInline2mhz(void);
 
 #ifdef __AVR_ATmega32U4__
 #define CHANPIN PIND
+#define REMAP_CHANNELS
       // remap channels
       /*D0->CH2: 2-0: [2]=6
         D1->CH3: 3-1: [3]=6
@@ -136,7 +137,12 @@ void captureInline2mhz(void);
         D3->CH0: 0-3: [0]=3
         D4->CH4: 4-4: [4]=0*/
 uint8_t channel_remap[8] = {3,1,6,6,0,0,0,0};
-#endif
+#endif //__AVR_ATmega32U4__
+
+#ifdef REMAP_CHANNELS
+#define MAP true
+#define UNMAP false
+#endif // __REMAP_CHANNELS
 
 /* XON/XOFF are not supported. */
 #define SUMP_RESET 0x00
@@ -336,8 +342,8 @@ void loop()
         captureMilli();
       }
 
-#ifdef __AVR_ATmega32U4__
-      remap_channels(channel_remap, logicdata, readCount);
+#ifdef REMAP_CHANNELS
+      remap_channels(channel_remap, logicdata, readCount, MAP);
 #endif
     
       /*
@@ -367,6 +373,11 @@ void loop()
        * we can just use it directly as our trigger mask.
        */
       getCmd();
+      
+#ifdef REMAP_CHANNELS
+      remap_channels(channel_remap, cmdBytes, 1, UNMAP);
+#endif
+
 #ifdef USE_PORTD
       trigger = cmdBytes[0] << 2;
 #else
@@ -379,6 +390,10 @@ void loop()
        * defines whether we're looking for it to be high or low.
        */
       getCmd();
+      
+#ifdef REMAP_CHANNELS
+      remap_channels(channel_remap, cmdBytes, 1, UNMAP);
+#endif
 #ifdef USE_PORTD
       trigger_values = cmdBytes[0] << 2;
 #else
@@ -537,16 +552,29 @@ void blinkled() {
  * uint8_t* map_array = [1,4,1,0,0,0,0,1]
  * 87654321 <- bit positions before
  * x7253x18 <- bit positions after.
- * unspecified bits are set to 0.
+ * unspecified bits will not be overwritten on a reverse!
+ * 
+ * To undo the mapping, pass in the same values with "reverse" 
+ * set to true.  Values will be rotated right instead of left. 
  */
-void remap_channels(uint8_t* map_array, byte* data, int len) {
+void remap_channels(uint8_t* map_array, byte* data, int len, bool action) {
   for(int i=0; i<len; i++) {
     byte remapped = 0;
     for(uint8_t j=0; j<8; j++) {
-      byte mask = 1<<j;
-      uint16_t current_bit = data[i] & mask;
-      // left circular bitshift
-      current_bit <<= map_array[j];
+      byte mask;
+      uint16_t current_bit;
+      if(action==MAP) {
+        // left circular bitshift
+        mask = 1<<j;
+        current_bit = data[i] & mask;
+        current_bit <<= map_array[j];
+      } else {  
+        // undo!  
+        mask = 1<<(j+map_array[j])%8; // find the place we shifted the original 'j' bit
+        current_bit = data[i] & mask;
+        current_bit <<= 8;            // overflow protection
+        current_bit >>= map_array[j]; // move it back
+      }
       // handle rollover
       if(highByte(current_bit)) {
         remapped |= highByte(current_bit);
