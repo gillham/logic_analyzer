@@ -127,6 +127,17 @@ void captureInline2mhz(void);
 #endif
 #define ledPin 13
 
+#ifdef __AVR_ATmega32U4__
+#define CHANPIN PIND
+      // remap channels
+      /*D0->CH2: 2-0: [2]=6
+        D1->CH3: 3-1: [3]=6
+        D2->CH1: 1-2: [1]=1
+        D3->CH0: 0-3: [0]=3
+        D4->CH4: 4-4: [4]=0*/
+uint8_t channel_remap[8] = {3,1,6,6,0,0,0,0};
+#endif
+
 /* XON/XOFF are not supported. */
 #define SUMP_RESET 0x00
 #define SUMP_ARM   0x01
@@ -287,6 +298,8 @@ void loop()
       Serial.write('S');
       break;
     case SUMP_ARM:
+    // make sure we're going to record from index 0.
+    logicIndex = 0;
       /*
          * Zero out any previous samples before arming.
        * Done here instead via reset due to spurious resets.
@@ -322,6 +335,31 @@ void loop()
       else {
         captureMilli();
       }
+
+#ifdef __AVR_ATmega32U4__
+      remap_channels(channel_remap, logicdata, readCount);
+#endif
+    
+      /*
+       * trigger may have fired and we have read delayCount of samples after the
+       * trigger fired.  triggerIndex now points to the trigger sample
+       * logicIndex now points to the last sample taken and logicIndex + 1
+       * is where we should start dumping since it is circular.
+       *
+       * our buffer starts one entry above the last read entry.
+       */
+      // the trigger may have fired; start printing from the logicIndex
+      for (i = 0 ; i < readCount; i++) {
+        if (logicIndex >= readCount) {
+          logicIndex = 0;
+        }
+#ifdef USE_PORTD
+        Serial.write(logicdata[logicIndex++] >> 2);
+#else
+        Serial.write(logicdata[logicIndex++]);
+#endif
+      }
+
       break;
     case SUMP_TRIGGER_MASK:
       /*
@@ -491,6 +529,35 @@ void blinkled() {
   delay(200);
 }
 
+/* remap_channels
+ * takes an 8-byte mapping array, a data array and a length
+ *  and maps the bytes of the data array as specified.
+ *  each map value indicates how far that indices' bit
+ *  should be rotated left (with rollover, max guaranteed 8);
+ * uint8_t* map_array = [1,4,1,0,0,0,0,1]
+ * 87654321 <- bit positions before
+ * x7253x18 <- bit positions after.
+ * unspecified bits are set to 0.
+ */
+void remap_channels(uint8_t* map_array, byte* data, int len) {
+  for(int i=0; i<len; i++) {
+    byte remapped = 0;
+    for(uint8_t j=0; j<8; j++) {
+      byte mask = 1<<j;
+      uint16_t current_bit = data[i] & mask;
+      // left circular bitshift
+      current_bit <<= map_array[j];
+      // handle rollover
+      if(highByte(current_bit)) {
+        remapped |= highByte(current_bit);
+      } else {
+        remapped |= lowByte(current_bit);
+      }
+    }
+    data[i] = remapped;
+  }
+}
+
 /*
  * Extended SUMP commands are 5 bytes.  A command byte followed by 4 bytes
  * of options. We already read the command byte, this gets the remaining
@@ -617,18 +684,6 @@ void captureMicro() {
 
   /* re-enable interrupts now that we're done sampling. */
   sei();
-
-  /*
-   * dump the samples back to the SUMP client.  nothing special
-   * is done for any triggers, this is effectively the 0/100 buffer split.
-   */
-  for (i = 0 ; i < readCount; i++) {
-#ifdef USE_PORTD
-    Serial.write(logicdata[i] >> 2);
-#else
-    Serial.write(logicdata[i]);
-#endif
-  }
 }
 
 /*
@@ -697,13 +752,6 @@ void captureMilli() {
       delay(delayTime);
     }
   }
-  for (i = 0 ; i < readCount; i++) {
-#ifdef USE_PORTD
-    Serial.write(logicdata[i] >> 2);
-#else
-    Serial.write(logicdata[i]);
-#endif
-  }
 }
 
 /*
@@ -716,9 +764,6 @@ void captureMilli() {
  */
 void triggerMicro() {
   unsigned int i = 0;
-
-  logicIndex = 0;
-  triggerIndex = 0;
 
   /*
    * disable interrupts during capture to maintain precision.
@@ -877,27 +922,8 @@ void triggerMicro() {
 
   /* re-enable interrupts */
   sei();
-
-  /*
-   * trigger has fired and we have read delayCount of samples after the
-   * trigger fired.  triggerIndex now points to the trigger sample
-   * logicIndex now points to the last sample taken and logicIndex + 1
-   * is where we should start dumping since it is circular.
-   *
-   * our buffer starts one entry above the last read entry.
-   */
-  logicIndex++;
-
-  for (i = 0 ; i < readCount; i++) {
-    if (logicIndex >= readCount) {
-      logicIndex = 0;
-    }
-#ifdef USE_PORTD
-    Serial.write(logicdata[logicIndex++] >> 2);
-#else
-    Serial.write(logicdata[logicIndex++]);
-#endif
-  }
+  logicIndex=(logicIndex+1) % readCount; // point to the start of our recording
+  return;
 }
 
 /*
