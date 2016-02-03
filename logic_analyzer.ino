@@ -127,23 +127,6 @@ void captureInline2mhz(void);
 #endif
 #define ledPin 13
 
-#ifdef __AVR_ATmega32U4__
-#define CHANPIN PIND
-#define REMAP_CHANNELS
-      // remap channels
-      /*D0->CH2: 2-0: [2]=6
-        D1->CH3: 3-1: [3]=6
-        D2->CH1: 1-2: [1]=1
-        D3->CH0: 0-3: [0]=3
-        D4->CH4: 4-4: [4]=0*/
-uint8_t channel_remap[8] = {3,1,6,6,0,0,0,0};
-#endif //__AVR_ATmega32U4__
-
-#ifdef REMAP_CHANNELS
-#define MAP true
-#define UNMAP false
-#endif // __REMAP_CHANNELS
-
 /* XON/XOFF are not supported. */
 #define SUMP_RESET 0x00
 #define SUMP_ARM   0x01
@@ -176,6 +159,14 @@ uint8_t channel_remap[8] = {3,1,6,6,0,0,0,0};
 #elif defined(__AVR_ATmega32U4__)
 #define DEBUG_CAPTURE_SIZE 2048
 #define CAPTURE_SIZE 2048
+#define CHANPIN PIND
+#define REMAP_CHANNELS
+      /*D0->CH2: 2-0: [2]=6
+        D1->CH3: 3-1: [3]=6
+        D2->CH1: 1-2: [1]=1
+        D3->CH0: 0-3: [0]=3
+        D4->CH4: 4-4: [4]=0*/
+uint8_t channel_remap[8] = {3,1,6,6,0,0,0,0};
 #elif defined(__AVR_ATmega328P__)
 #define DEBUG_CAPTURE_SIZE 1024
 #define CAPTURE_SIZE 1024
@@ -183,6 +174,11 @@ uint8_t channel_remap[8] = {3,1,6,6,0,0,0,0};
 #define DEBUG_CAPTURE_SIZE 532
 #define CAPTURE_SIZE 532
 #endif
+
+#ifdef REMAP_CHANNELS
+#define MAP true
+#define UNMAP false
+#endif // __REMAP_CHANNELS
 
 #ifdef USE_PORTD
 #define DEBUG_ENABLE DDRB = DDRB | B00000001
