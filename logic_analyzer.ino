@@ -159,6 +159,17 @@ void captureInline2mhz(void);
 #elif defined(__AVR_ATmega32U4__)
 #define DEBUG_CAPTURE_SIZE 2048
 #define CAPTURE_SIZE 2048
+#define CHANPIN PIND
+#define REMAP_CHANNELS
+      /* DX corresponds to what's printed on the PCB, 
+         CH[X] corresponds to the channel in LogicSniffer
+        D0->CH[2]: 0-2=-2=6: channel_remap[2]=6
+        D1->CH[3]: 1-3=-2=6: channel_remap[3]=6
+        D2->CH[1]: 2-1=1   : channel_remap[1]=1
+        D3->CH[0]: 3-0=3   : channel_remap[0]=3
+        D4->CH[4]: 4-4=0   : channel_remap[4]=0
+        ...*/
+const uint8_t channel_remap[8] = {3,1,6,6,0,0,0,0};
 #elif defined(__AVR_ATmega328P__)
 #define DEBUG_CAPTURE_SIZE 1024
 #define CAPTURE_SIZE 1024
@@ -166,6 +177,10 @@ void captureInline2mhz(void);
 #define DEBUG_CAPTURE_SIZE 532
 #define CAPTURE_SIZE 532
 #endif
+
+// aliases for remap_channels forward/reverse operation
+#define MAP true
+#define UNMAP false
 
 #ifdef USE_PORTD
 #define DEBUG_ENABLE DDRB = DDRB | B00000001
@@ -287,6 +302,8 @@ void loop()
       Serial.write('S');
       break;
     case SUMP_ARM:
+    // make sure we're going to record from index 0.
+    logicIndex = 0;
       /*
          * Zero out any previous samples before arming.
        * Done here instead via reset due to spurious resets.
@@ -322,6 +339,31 @@ void loop()
       else {
         captureMilli();
       }
+
+#ifdef REMAP_CHANNELS
+      remap_channels(channel_remap, logicdata, readCount, MAP);
+#endif
+    
+      /*
+       * trigger may have fired and we have read delayCount of samples after the
+       * trigger fired.  triggerIndex now points to the trigger sample
+       * logicIndex now points to the last sample taken and logicIndex + 1
+       * is where we should start dumping since it is circular.
+       *
+       * our buffer starts one entry above the last read entry.
+       */
+      // the trigger may have fired; start printing from the logicIndex
+      for (i = 0 ; i < readCount; i++) {
+        if (logicIndex >= readCount) {
+          logicIndex = 0;
+        }
+#ifdef USE_PORTD
+        Serial.write(logicdata[logicIndex++] >> 2);
+#else
+        Serial.write(logicdata[logicIndex++]);
+#endif
+      }
+
       break;
     case SUMP_TRIGGER_MASK:
       /*
@@ -329,6 +371,11 @@ void loop()
        * we can just use it directly as our trigger mask.
        */
       getCmd();
+      
+#ifdef REMAP_CHANNELS
+      remap_channels(channel_remap, cmdBytes, 1, UNMAP);
+#endif
+
 #ifdef USE_PORTD
       trigger = cmdBytes[0] << 2;
 #else
@@ -341,6 +388,10 @@ void loop()
        * defines whether we're looking for it to be high or low.
        */
       getCmd();
+      
+#ifdef REMAP_CHANNELS
+      remap_channels(channel_remap, cmdBytes, 1, UNMAP);
+#endif
 #ifdef USE_PORTD
       trigger_values = cmdBytes[0] << 2;
 #else
@@ -491,6 +542,50 @@ void blinkled() {
   delay(200);
 }
 
+/* remap_channels
+ * Takes an 8-byte mapping array, a data array and a length
+ *  and maps the bytes of the data array as specified.
+ *  each map value indicates how far that indices' bit
+ *  should be rotated left (with rollover, max guaranteed 8);
+ * uint8_t* map_array = [1,4,1,0,0,0,0,1]
+ *  87654321 <- bit positions before
+ *  x7253x18 <- bit positions after.
+ * Unspecified bits (as above) will not be overwritten on a reverse! 
+ *  This is bad, because it is impossible to reverse. Reversing is
+ *  important for triggers.
+ * 
+ * To undo the mapping, pass in the same values with "reverse" 
+ * set to true.  Values will be rotated right instead of left. 
+ */
+void remap_channels(const uint8_t* map_array, byte* data, int len, bool action) {
+  for(int i=0; i<len; i++) {
+    byte remapped = 0;
+    for(uint8_t j=0; j<8; j++) {
+      byte mask;
+      uint16_t current_bit;
+      if(action==MAP) {
+        // left circular bitshift
+        mask = 1<<j;
+        current_bit = data[i] & mask;
+        current_bit <<= map_array[j];
+      } else {  
+        // undo!  
+        mask = 1<<(j+map_array[j])%8; // find the place we shifted the original 'j' bit
+        current_bit = data[i] & mask;
+        current_bit <<= 8;            // overflow protection
+        current_bit >>= map_array[j]; // move it back
+      }
+      // handle rollover
+      if(highByte(current_bit)) {
+        remapped |= highByte(current_bit);
+      } else {
+        remapped |= lowByte(current_bit);
+      }
+    }
+    data[i] = remapped;
+  }
+}
+
 /*
  * Extended SUMP commands are 5 bytes.  A command byte followed by 4 bytes
  * of options. We already read the command byte, this gets the remaining
@@ -617,18 +712,6 @@ void captureMicro() {
 
   /* re-enable interrupts now that we're done sampling. */
   sei();
-
-  /*
-   * dump the samples back to the SUMP client.  nothing special
-   * is done for any triggers, this is effectively the 0/100 buffer split.
-   */
-  for (i = 0 ; i < readCount; i++) {
-#ifdef USE_PORTD
-    Serial.write(logicdata[i] >> 2);
-#else
-    Serial.write(logicdata[i]);
-#endif
-  }
 }
 
 /*
@@ -697,13 +780,6 @@ void captureMilli() {
       delay(delayTime);
     }
   }
-  for (i = 0 ; i < readCount; i++) {
-#ifdef USE_PORTD
-    Serial.write(logicdata[i] >> 2);
-#else
-    Serial.write(logicdata[i]);
-#endif
-  }
 }
 
 /*
@@ -716,9 +792,6 @@ void captureMilli() {
  */
 void triggerMicro() {
   unsigned int i = 0;
-
-  logicIndex = 0;
-  triggerIndex = 0;
 
   /*
    * disable interrupts during capture to maintain precision.
@@ -877,27 +950,7 @@ void triggerMicro() {
 
   /* re-enable interrupts */
   sei();
-
-  /*
-   * trigger has fired and we have read delayCount of samples after the
-   * trigger fired.  triggerIndex now points to the trigger sample
-   * logicIndex now points to the last sample taken and logicIndex + 1
-   * is where we should start dumping since it is circular.
-   *
-   * our buffer starts one entry above the last read entry.
-   */
-  logicIndex++;
-
-  for (i = 0 ; i < readCount; i++) {
-    if (logicIndex >= readCount) {
-      logicIndex = 0;
-    }
-#ifdef USE_PORTD
-    Serial.write(logicdata[logicIndex++] >> 2);
-#else
-    Serial.write(logicdata[logicIndex++]);
-#endif
-  }
+  return;
 }
 
 /*
