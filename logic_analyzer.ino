@@ -949,9 +949,7 @@ void triggerMicro() {
   }
 
   /* re-enable interrupts */
-  sei();
-  logicIndex=(logicIndex+1) % readCount; // point to the start of our recording
-  return;
+  sei();  return;
 }
 
 /*
