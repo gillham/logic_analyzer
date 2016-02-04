@@ -114,6 +114,9 @@ void captureInline2mhz(void);
 #define CHAN3 5
 #define CHAN4 6
 #define CHAN5 7
+// shift channels left by 2
+#define REMAP_CHANNELS
+const uint8_t channel_remap[8] = {6,6,6,6,6,6,6,6};
 #else
 #define CHANPIN PINB
 #define CHAN0 8
@@ -157,7 +160,7 @@ void captureInline2mhz(void);
 #define DEBUG_CAPTURE_SIZE 7168
 #define CAPTURE_SIZE 7168
 #elif defined(__AVR_ATmega32U4__)
-#define DEBUG_CAPTURE_SIZE 2048
+#define DEBUG_CAPTURE_SIZE 1024
 #define CAPTURE_SIZE 2048
 #define CHANPIN PIND
 #define REMAP_CHANNELS
@@ -354,11 +357,7 @@ void loop()
         if (logicIndex >= readCount) {
           logicIndex = 0;
         }
-#ifdef USE_PORTD
-        Serial.write(logicdata[logicIndex++] >> 2);
-#else
         Serial.write(logicdata[logicIndex++]);
-#endif
       }
 
       break;
@@ -373,11 +372,7 @@ void loop()
       remap_channels(channel_remap, cmdBytes, 1, UNMAP);
 #endif
 
-#ifdef USE_PORTD
-      trigger = cmdBytes[0] << 2;
-#else
       trigger = cmdBytes[0];
-#endif
       break;
     case SUMP_TRIGGER_VALUES:
       /*
@@ -389,11 +384,8 @@ void loop()
 #ifdef REMAP_CHANNELS
       remap_channels(channel_remap, cmdBytes, 1, UNMAP);
 #endif
-#ifdef USE_PORTD
-      trigger_values = cmdBytes[0] << 2;
-#else
+
       trigger_values = cmdBytes[0];
-#endif
       break;
     case SUMP_TRIGGER_CONFIG:
       /* read the rest of the command bytes, but ignore them. */
@@ -461,6 +453,9 @@ void loop()
       Serial.println("4 = capture at 4MHz");
       Serial.println("5 = capture at 1MHz");
       Serial.println("6 = capture at 500KHz");
+#ifdef REMAP_CHANNELS
+      Serial.println("7 = remap channels");
+#endif
       break;
 #ifdef DEBUG
     case '0':
@@ -524,6 +519,11 @@ void loop()
       Serial.println("");
       Serial.println("500KHz capture done.");
       break;
+#ifdef REMAP_CHANNELS
+    case '7':
+      remap_channels(channel_remap, logicdata, readCount, UNMAP);
+      break;
+#endif
 #endif /* DEBUG_MENU */
     default:
       /* ignore any unrecognized bytes. */
@@ -1101,11 +1101,7 @@ void debugdump() {
   Serial.print("\r\n");
 
   for (i = 0 ; i < MAX_CAPTURE_SIZE; i++) {
-#ifdef USE_PORTD
-    Serial.print(logicdata[i] >> 2, HEX);
-#else
     Serial.print(logicdata[i], HEX);
-#endif
     Serial.print(" ");
     if (j == 32) {
       Serial.print("\r\n");
@@ -1128,11 +1124,7 @@ void prettydump() {
   Serial.print("\r\n");
 
   for (i = 0 ; i < 64; i++) {
-#ifdef USE_PORTD
-    k = logicdata[i] >> 2;
-#else
     k = logicdata[i];
-#endif
     for (j = 0; j < 8; j++) {
       if (k & 0x01)
         Serial.print("| ");
