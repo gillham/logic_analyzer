@@ -218,8 +218,8 @@ unsigned int logicIndex = 0;
 unsigned int triggerIndex = 0;
 unsigned int readCount = MAX_CAPTURE_SIZE;
 unsigned int delayCount = 0;
-unsigned int trigger = 0;
-unsigned int trigger_values = 0;
+byte trigger = 0;
+byte trigger_values = 0;
 unsigned int useMicro = 0;
 unsigned int delayTime = 0;
 unsigned long divider = 0;
@@ -368,11 +368,10 @@ void loop()
        */
       getCmd();
       
-#ifdef REMAP_CHANNELS
-      remap_channels(channel_remap, cmdBytes, 1, UNMAP);
-#endif
-
       trigger = cmdBytes[0];
+#ifdef REMAP_CHANNELS
+      remap_channels(channel_remap, &trigger, 1, UNMAP);
+#endif
       break;
     case SUMP_TRIGGER_VALUES:
       /*
@@ -380,12 +379,11 @@ void loop()
        * defines whether we're looking for it to be high or low.
        */
       getCmd();
-      
-#ifdef REMAP_CHANNELS
-      remap_channels(channel_remap, cmdBytes, 1, UNMAP);
-#endif
 
       trigger_values = cmdBytes[0];
+#ifdef REMAP_CHANNELS
+      remap_channels(channel_remap, &trigger_values, 1, UNMAP);
+#endif
       break;
     case SUMP_TRIGGER_CONFIG:
       /* read the rest of the command bytes, but ignore them. */
