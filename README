@@ -19,6 +19,9 @@ Uncomment CHAN5 below if you want to use the LED pin as an input and have
 On the Arduino Mega board 8 channels are supported and 7k of samples.
 Pins 22-29 (Port A) are used by default.
 
+On the Arduino Leonardo, D0-D4 are directly mapped to channels 0-4, with up
+to 2k of samples.
+
 To use this with the original or alternative SUMP clients,
 use these settings:
 

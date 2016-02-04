@@ -114,6 +114,9 @@ void captureInline2mhz(void);
 #define CHAN3 5
 #define CHAN4 6
 #define CHAN5 7
+// shift channels left by 2
+#define REMAP_CHANNELS
+const uint8_t channel_remap[8] = {6,6,6,6,6,6,6,6};
 #else
 #define CHANPIN PINB
 #define CHAN0 8
@@ -157,8 +160,16 @@ void captureInline2mhz(void);
 #define DEBUG_CAPTURE_SIZE 7168
 #define CAPTURE_SIZE 7168
 #elif defined(__AVR_ATmega32U4__)
-#define DEBUG_CAPTURE_SIZE 2048
+#define DEBUG_CAPTURE_SIZE 1024
 #define CAPTURE_SIZE 2048
+#define CHANPIN PIND
+#define REMAP_CHANNELS
+      /*D0->CH2: 2-0: [2]=6
+        D1->CH3: 3-1: [3]=6
+        D2->CH1: 1-2: [1]=1
+        D3->CH0: 0-3: [0]=3
+        D4->CH4: 4-4: [4]=0*/
+const uint8_t channel_remap[8] = {3,1,6,6,0,0,0,0};
 #elif defined(__AVR_ATmega328P__)
 #define DEBUG_CAPTURE_SIZE 1024
 #define CAPTURE_SIZE 1024
@@ -166,6 +177,10 @@ void captureInline2mhz(void);
 #define DEBUG_CAPTURE_SIZE 532
 #define CAPTURE_SIZE 532
 #endif
+
+// aliases for remap_channels forward/reverse operation
+#define MAP true
+#define UNMAP false
 
 #ifdef USE_PORTD
 #define DEBUG_ENABLE DDRB = DDRB | B00000001
@@ -203,8 +218,8 @@ unsigned int logicIndex = 0;
 unsigned int triggerIndex = 0;
 unsigned int readCount = MAX_CAPTURE_SIZE;
 unsigned int delayCount = 0;
-unsigned int trigger = 0;
-unsigned int trigger_values = 0;
+byte trigger = 0;
+byte trigger_values = 0;
 unsigned int useMicro = 0;
 unsigned int delayTime = 0;
 unsigned long divider = 0;
@@ -287,6 +302,8 @@ void loop()
       Serial.write('S');
       break;
     case SUMP_ARM:
+    // make sure we're going to record from index 0.
+    logicIndex = 0;
       /*
          * Zero out any previous samples before arming.
        * Done here instead via reset due to spurious resets.
@@ -322,6 +339,27 @@ void loop()
       else {
         captureMilli();
       }
+
+#ifdef REMAP_CHANNELS
+      remap_channels(channel_remap, logicdata, readCount, MAP);
+#endif
+    
+      /*
+       * trigger may have fired and we have read delayCount of samples after the
+       * trigger fired.  triggerIndex now points to the trigger sample
+       * logicIndex now points to the last sample taken and logicIndex + 1
+       * is where we should start dumping since it is circular.
+       *
+       * our buffer starts one entry above the last read entry.
+       */
+      // the trigger may have fired; start printing from the logicIndex
+      for (i = 0 ; i < readCount; i++) {
+        if (logicIndex >= readCount) {
+          logicIndex = 0;
+        }
+        Serial.write(logicdata[logicIndex++]);
+      }
+
       break;
     case SUMP_TRIGGER_MASK:
       /*
@@ -329,10 +367,10 @@ void loop()
        * we can just use it directly as our trigger mask.
        */
       getCmd();
-#ifdef USE_PORTD
-      trigger = cmdBytes[0] << 2;
-#else
+      
       trigger = cmdBytes[0];
+#ifdef REMAP_CHANNELS
+      remap_channels(channel_remap, &trigger, 1, UNMAP);
 #endif
       break;
     case SUMP_TRIGGER_VALUES:
@@ -341,10 +379,10 @@ void loop()
        * defines whether we're looking for it to be high or low.
        */
       getCmd();
-#ifdef USE_PORTD
-      trigger_values = cmdBytes[0] << 2;
-#else
+
       trigger_values = cmdBytes[0];
+#ifdef REMAP_CHANNELS
+      remap_channels(channel_remap, &trigger_values, 1, UNMAP);
 #endif
       break;
     case SUMP_TRIGGER_CONFIG:
@@ -413,6 +451,9 @@ void loop()
       Serial.println("4 = capture at 4MHz");
       Serial.println("5 = capture at 1MHz");
       Serial.println("6 = capture at 500KHz");
+#ifdef REMAP_CHANNELS
+      Serial.println("7 = remap channels");
+#endif
       break;
 #ifdef DEBUG
     case '0':
@@ -476,6 +517,11 @@ void loop()
       Serial.println("");
       Serial.println("500KHz capture done.");
       break;
+#ifdef REMAP_CHANNELS
+    case '7':
+      remap_channels(channel_remap, logicdata, readCount, UNMAP);
+      break;
+#endif
 #endif /* DEBUG_MENU */
     default:
       /* ignore any unrecognized bytes. */
@@ -489,6 +535,48 @@ void blinkled() {
   delay(200);
   digitalWrite(ledPin, LOW);
   delay(200);
+}
+
+/* remap_channels
+ * takes an 8-byte mapping array, a data array and a length
+ *  and maps the bytes of the data array as specified.
+ *  each map value indicates how far that indices' bit
+ *  should be rotated left (with rollover, max guaranteed 8);
+ * uint8_t* map_array = [1,4,1,0,0,0,0,1]
+ * 87654321 <- bit positions before
+ * x7253x18 <- bit positions after.
+ * unspecified bits will not be overwritten on a reverse!
+ * 
+ * To undo the mapping, pass in the same values with "reverse" 
+ * set to true.  Values will be rotated right instead of left. 
+ */
+void remap_channels(const uint8_t* map_array, byte* data, int len, bool action) {
+  for(int i=0; i<len; i++) {
+    byte remapped = 0;
+    for(uint8_t j=0; j<8; j++) {
+      byte mask;
+      uint16_t current_bit;
+      if(action==MAP) {
+        // left circular bitshift
+        mask = 1<<j;
+        current_bit = data[i] & mask;
+        current_bit <<= map_array[j];
+      } else {  
+        // undo!  
+        mask = 1<<(j+map_array[j])%8; // find the place we shifted the original 'j' bit
+        current_bit = data[i] & mask;
+        current_bit <<= 8;            // overflow protection
+        current_bit >>= map_array[j]; // move it back
+      }
+      // handle rollover
+      if(highByte(current_bit)) {
+        remapped |= highByte(current_bit);
+      } else {
+        remapped |= lowByte(current_bit);
+      }
+    }
+    data[i] = remapped;
+  }
 }
 
 /*
@@ -617,18 +705,6 @@ void captureMicro() {
 
   /* re-enable interrupts now that we're done sampling. */
   sei();
-
-  /*
-   * dump the samples back to the SUMP client.  nothing special
-   * is done for any triggers, this is effectively the 0/100 buffer split.
-   */
-  for (i = 0 ; i < readCount; i++) {
-#ifdef USE_PORTD
-    Serial.write(logicdata[i] >> 2);
-#else
-    Serial.write(logicdata[i]);
-#endif
-  }
 }
 
 /*
@@ -697,13 +773,6 @@ void captureMilli() {
       delay(delayTime);
     }
   }
-  for (i = 0 ; i < readCount; i++) {
-#ifdef USE_PORTD
-    Serial.write(logicdata[i] >> 2);
-#else
-    Serial.write(logicdata[i]);
-#endif
-  }
 }
 
 /*
@@ -716,9 +785,6 @@ void captureMilli() {
  */
 void triggerMicro() {
   unsigned int i = 0;
-
-  logicIndex = 0;
-  triggerIndex = 0;
 
   /*
    * disable interrupts during capture to maintain precision.
@@ -877,27 +943,8 @@ void triggerMicro() {
 
   /* re-enable interrupts */
   sei();
-
-  /*
-   * trigger has fired and we have read delayCount of samples after the
-   * trigger fired.  triggerIndex now points to the trigger sample
-   * logicIndex now points to the last sample taken and logicIndex + 1
-   * is where we should start dumping since it is circular.
-   *
-   * our buffer starts one entry above the last read entry.
-   */
-  logicIndex++;
-
-  for (i = 0 ; i < readCount; i++) {
-    if (logicIndex >= readCount) {
-      logicIndex = 0;
-    }
-#ifdef USE_PORTD
-    Serial.write(logicdata[logicIndex++] >> 2);
-#else
-    Serial.write(logicdata[logicIndex++]);
-#endif
-  }
+  logicIndex=(logicIndex+1) % readCount; // point to the start of our recording
+  return;
 }
 
 /*
@@ -1052,11 +1099,7 @@ void debugdump() {
   Serial.print("\r\n");
 
   for (i = 0 ; i < MAX_CAPTURE_SIZE; i++) {
-#ifdef USE_PORTD
-    Serial.print(logicdata[i] >> 2, HEX);
-#else
     Serial.print(logicdata[i], HEX);
-#endif
     Serial.print(" ");
     if (j == 32) {
       Serial.print("\r\n");
@@ -1079,11 +1122,7 @@ void prettydump() {
   Serial.print("\r\n");
 
   for (i = 0 ; i < 64; i++) {
-#ifdef USE_PORTD
-    k = logicdata[i] >> 2;
-#else
     k = logicdata[i];
-#endif
     for (j = 0; j < 8; j++) {
       if (k & 0x01)
         Serial.print("| ");
