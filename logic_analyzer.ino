@@ -162,7 +162,7 @@ void captureInline2mhz(void);
 #define CHANPIN PIND
 #define REMAP_CHANNELS
       /* DX corresponds to what's printed on the PCB, 
-          CH[X] corresponds to the channel in LogicSniffer
+         CH[X] corresponds to the channel in LogicSniffer
         D0->CH[2]: 0-2=-2=6: channel_remap[2]=6
         D1->CH[3]: 1-3=-2=6: channel_remap[3]=6
         D2->CH[1]: 2-1=1   : channel_remap[1]=1
@@ -949,7 +949,8 @@ void triggerMicro() {
   }
 
   /* re-enable interrupts */
-  sei();  return;
+  sei();
+  return;
 }
 
 /*
