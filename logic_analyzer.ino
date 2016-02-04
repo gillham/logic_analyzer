@@ -161,11 +161,14 @@ void captureInline2mhz(void);
 #define CAPTURE_SIZE 2048
 #define CHANPIN PIND
 #define REMAP_CHANNELS
-      /*D0->CH2: 2-0: [2]=6
-        D1->CH3: 3-1: [3]=6
-        D2->CH1: 1-2: [1]=1
-        D3->CH0: 0-3: [0]=3
-        D4->CH4: 4-4: [4]=0*/
+      /* DX corresponds to what's printed on the PCB, 
+          CH[X] corresponds to the channel in LogicSniffer
+        D0->CH[2]: 0-2=-2=6: channel_remap[2]=6
+        D1->CH[3]: 1-3=-2=6: channel_remap[3]=6
+        D2->CH[1]: 2-1=1   : channel_remap[1]=1
+        D3->CH[0]: 3-0=3   : channel_remap[0]=3
+        D4->CH[4]: 4-4=0   : channel_remap[4]=0
+        ...*/
 const uint8_t channel_remap[8] = {3,1,6,6,0,0,0,0};
 #elif defined(__AVR_ATmega328P__)
 #define DEBUG_CAPTURE_SIZE 1024
@@ -540,14 +543,16 @@ void blinkled() {
 }
 
 /* remap_channels
- * takes an 8-byte mapping array, a data array and a length
+ * Takes an 8-byte mapping array, a data array and a length
  *  and maps the bytes of the data array as specified.
  *  each map value indicates how far that indices' bit
  *  should be rotated left (with rollover, max guaranteed 8);
  * uint8_t* map_array = [1,4,1,0,0,0,0,1]
- * 87654321 <- bit positions before
- * x7253x18 <- bit positions after.
- * unspecified bits will not be overwritten on a reverse!
+ *  87654321 <- bit positions before
+ *  x7253x18 <- bit positions after.
+ * Unspecified bits (as above) will not be overwritten on a reverse! 
+ *  This is bad, because it is impossible to reverse. Reversing is
+ *  important for triggers.
  * 
  * To undo the mapping, pass in the same values with "reverse" 
  * set to true.  Values will be rotated right instead of left. 
