@@ -166,7 +166,7 @@ void captureInline2mhz(void);
         D2->CH1: 1-2: [1]=1
         D3->CH0: 0-3: [0]=3
         D4->CH4: 4-4: [4]=0*/
-uint8_t channel_remap[8] = {3,1,6,6,0,0,0,0};
+const uint8_t channel_remap[8] = {3,1,6,6,0,0,0,0};
 #elif defined(__AVR_ATmega328P__)
 #define DEBUG_CAPTURE_SIZE 1024
 #define CAPTURE_SIZE 1024
@@ -175,10 +175,9 @@ uint8_t channel_remap[8] = {3,1,6,6,0,0,0,0};
 #define CAPTURE_SIZE 532
 #endif
 
-#ifdef REMAP_CHANNELS
+// aliases for remap_channels forward/reverse operation
 #define MAP true
 #define UNMAP false
-#endif // __REMAP_CHANNELS
 
 #ifdef USE_PORTD
 #define DEBUG_ENABLE DDRB = DDRB | B00000001
@@ -553,7 +552,7 @@ void blinkled() {
  * To undo the mapping, pass in the same values with "reverse" 
  * set to true.  Values will be rotated right instead of left. 
  */
-void remap_channels(uint8_t* map_array, byte* data, int len, bool action) {
+void remap_channels(const uint8_t* map_array, byte* data, int len, bool action) {
   for(int i=0; i<len; i++) {
     byte remapped = 0;
     for(uint8_t j=0; j<8; j++) {
