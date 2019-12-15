@@ -471,7 +471,7 @@ void loop()
          * This runs a sample capture at 500KHz.
        * delayTime = 2ms for 500KHz.
        */
-      delayTime = 1;
+      delayTime = 2;
       captureMicro();
       Serial.println("");
       Serial.println("500KHz capture done.");
