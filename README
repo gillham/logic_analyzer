@@ -7,6 +7,9 @@ SUMP client as well as the alternative client from here:
 
 The alternative client version is highly recommended.  Download version
 "ols-0.9.7" or newer for built-in device profiles.
+NOTE: The latest officially released version of ols (0.9.7.2) does not work
+      with modern Java runtimes.  You will need to build it yourself.
+      Follow the build instructions here: https://github.com/jawi/ols
 
 This SUMP protocol compatible logic analyzer for the Arduino board supports
 5 channels consisting of digital pins 8-12, which are the first 5 bits (0-4)
