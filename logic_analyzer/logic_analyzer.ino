@@ -62,7 +62,7 @@
  * until after the trigger fires.
  * Please try it out and report back.
  *
- * Release: v0.14 December 16, 2015.
+ * Release: v0.15 December 21, 2021.
  *
  */
 
