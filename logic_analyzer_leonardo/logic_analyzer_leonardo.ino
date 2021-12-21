@@ -918,7 +918,7 @@ void get_metadata() {
   Serial.write('0');
   Serial.write('.');
   Serial.write('1');
-  Serial.write('2');
+  Serial.write('5');
   Serial.write((uint8_t)0x00);
 
   /* sample memory */
