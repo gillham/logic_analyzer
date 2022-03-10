@@ -84,6 +84,8 @@ void debugdump(void);
 void prettydump(void);
 void captureInline4mhz(void);
 void captureInline2mhz(void);
+void sendData(void);
+void sendDataTrigger(void);
 
 /*
  * Should we use PORTD or PORTB?  (default is PORTB)
@@ -185,6 +187,8 @@ void captureInline2mhz(void);
 #else
 #define MAX_CAPTURE_SIZE CAPTURE_SIZE
 #endif /* DEBUG */
+
+#define USE_PULSEVIEW // Uncomment this line if do you want use Pulseview as SUMP client.
 
 /*
  * SUMP command from host (via serial)
@@ -518,6 +522,61 @@ void getCmd() {
 }
 
 /*
+ * dump the samples back to the SUMP client.  nothing special
+ * is done for any triggers, this is effectively the 0/100 buffer split.
+ */
+   
+void sendData()
+{
+  unsigned int i;
+  #ifdef USE_PULSEVIEW
+    for (i = readCount-1 ; i >= 0; i--) {
+  #ifdef USE_PORTD
+      Serial.write(logicdata[i] >> 2);
+  #else
+      Serial.write(logicdata[i]);
+  #endif
+    }
+  #else
+      for (i = 0 ; i < readCount; i++) {
+    #ifdef USE_PORTD
+        Serial.write(logicdata[i] >> 2);
+    #else
+        Serial.write(logicdata[i]);
+    #endif
+      }
+  #endif
+}
+
+void sendDataTrigger()
+{
+  unsigned int i;
+  #ifdef USE_PULSEVIEW
+    for (i = readCount -1; i >= 0; i--) {
+        if (logicIndex >= readCount) {
+          logicIndex = readCount - 1;
+        }
+    #ifdef USE_PORTD
+        Serial.write(logicdata[logicIndex--] >> 2);
+    #else
+        Serial.write(logicdata[logicIndex--]);
+    #endif
+      }
+  #else
+      for (i = 0 ; i < readCount; i++) {
+        if (logicIndex >= readCount) {
+          logicIndex = 0;
+        }
+    #ifdef USE_PORTD
+        Serial.write(logicdata[logicIndex++] >> 2);
+    #else
+        Serial.write(logicdata[logicIndex++]);
+    #endif
+      }
+  #endif
+}
+
+/*
  * This function samples data using a microsecond delay function.
  * It also has rudimentary trigger support where it will just sit in
  * a busy loop waiting for the trigger conditions to occur.
@@ -618,17 +677,7 @@ void captureMicro() {
   /* re-enable interrupts now that we're done sampling. */
   sei();
 
-  /*
-   * dump the samples back to the SUMP client.  nothing special
-   * is done for any triggers, this is effectively the 0/100 buffer split.
-   */
-  for (i = 0 ; i < readCount; i++) {
-#ifdef USE_PORTD
-    Serial.write(logicdata[i] >> 2);
-#else
-    Serial.write(logicdata[i]);
-#endif
-  }
+  sendData(); // Send all samples to SUMP client
 }
 
 /*
@@ -697,13 +746,7 @@ void captureMilli() {
       delay(delayTime);
     }
   }
-  for (i = 0 ; i < readCount; i++) {
-#ifdef USE_PORTD
-    Serial.write(logicdata[i] >> 2);
-#else
-    Serial.write(logicdata[i]);
-#endif
-  }
+  sendData(); // Send all samples to SUMP client
 }
 
 /*
@@ -888,16 +931,7 @@ void triggerMicro() {
    */
   logicIndex++;
 
-  for (i = 0 ; i < readCount; i++) {
-    if (logicIndex >= readCount) {
-      logicIndex = 0;
-    }
-#ifdef USE_PORTD
-    Serial.write(logicdata[logicIndex++] >> 2);
-#else
-    Serial.write(logicdata[logicIndex++]);
-#endif
-  }
+  sendDataTrigger();
 }
 
 /*
@@ -1095,15 +1129,3 @@ void prettydump() {
   }
 }
 #endif /* DEBUG_MENU */
-
-
-
-
-
-
-
-
-
-
-
-
