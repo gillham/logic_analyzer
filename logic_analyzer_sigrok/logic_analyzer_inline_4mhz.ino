@@ -2,7 +2,7 @@
  *
  * SUMP Protocol Implementation for Arduino boards.
  *
- * Copyright (c) 2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021 Andrew Gillham
+ * Copyright (c) 2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023 Andrew Gillham
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,7 +45,7 @@
  */
 
 void captureInline4mhz() {
-  unsigned int i;
+  signed int i;
 
   /*
    * basic trigger, wait until all trigger conditions are met on port.
@@ -14441,7 +14441,7 @@ void captureInline4mhz() {
    * dump the samples back to the SUMP client.  nothing special
    * is done for any triggers, this is effectively the 0/100 buffer split.
    */
-  for (i = readCount ; i > 0; i--) {
+  for (i = readCount-1 ; i >= 0; i--) {
 #ifdef USE_PORTD
     Serial.write(logicdata[i] >> 2);
 #else
