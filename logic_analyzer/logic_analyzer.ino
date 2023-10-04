@@ -2,7 +2,7 @@
  *
  * SUMP Protocol Implementation for Arduino boards.
  *
- * Copyright (c) 2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021 Andrew Gillham
+ * Copyright (c) 2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023 Andrew Gillham
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -62,7 +62,7 @@
  * until after the trigger fires.
  * Please try it out and report back.
  *
- * Release: v0.15 December 21, 2021.
+ * Release: v0.16 October 3, 2023.
  *
  */
 
@@ -949,7 +949,7 @@ void get_metadata() {
   Serial.write('0');
   Serial.write('.');
   Serial.write('1');
-  Serial.write('5');
+  Serial.write('6');
   Serial.write((uint8_t)0x00);
 
   /* sample memory */

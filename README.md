@@ -17,6 +17,31 @@ Pins 22-29 (Port A) are used by default.
 Client Software
 ===============
 
+Sigrok support via the 'ols' device configuration has been added. This
+mostly involved returning the capture buffer in the reverse order.
+
+Use the `logic_analyzer_sigrok` sketch.  Since the OLS alternative client
+mentioned below has some issues with newer Java versions, Sigrok is currently
+the only practical way to use this logic analyzer.  If you use an older machine
+with an older operating system and older Java you can probably use the OLS client.
+
+Sigrok support seems to work fairly well so I would currently recommend it for
+anyone interested in trying this sketch.
+
+Run PulseView like this on Linux: (I'll add Windows options after more testing)
+```
+PulseView --driver=ols:conn=/dev/ttyUSB0 --dont-scan
+```
+
+It may be necessary to exit and relaunch PulseView to get it to recognize the device.
+An easy way to test the device is using the `sigrok-cli` utility. The command below
+samples channel 2 at 1MHz.  If you get a device not found error, but /dev/ttyUSB0 exists,
+run this command a couple times and usually it will start working. Due to the way opening
+the serial port resets the Arduino there are some issues/bugs to work out yet.
+```
+sigrok-cli --driver=ols:conn=/dev/ttyUSB0 --config samplerate=1Mhz --config pattern=External --samples 1024 --channels 2
+```
+
 The OLS alternative client hasn't had an official release recently so you will
 need to compile it yourself.
 
