@@ -2,7 +2,7 @@
  *
  * SUMP Protocol Implementation for Arduino boards.
  *
- * Copyright (c) 2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021 Andrew Gillham
+ * Copyright (c) 2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023 Andrew Gillham
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -44,7 +44,7 @@
  *
  */
 
-void captureInline2mhz() {
+void captureInline4mhz() {
   unsigned int i;
 
   /*
@@ -82,13 +82,13 @@ void captureInline2mhz() {
 
   /*
    * Unroll loop to maximize capture speed.
-   * Pad with 5 cycles to make this run at 2MHz.
-   * Using the RJMP instructions (instead of NOP) reduces flash usage by 4096 bytes.
+   * Pad with 1 NOP (1 cycle) to make this run at 4MHz.
+   *
    *
    */
 
 #undef INLINE_NOP
-#define INLINE_NOP		__asm__("nop\n\t""rjmp 1f\n\t""1:\n\t""rjmp 2f\n\t""2:\n\t");
+#define INLINE_NOP		__asm__("nop\n\t");
 
   logicdata[0] = CHANPIN;
   INLINE_NOP;

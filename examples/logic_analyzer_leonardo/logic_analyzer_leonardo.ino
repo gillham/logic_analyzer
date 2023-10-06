@@ -62,7 +62,7 @@
  * until after the trigger fires.
  * Please try it out and report back.
  *
- * Release: v0.16 October 3, 2023.
+ * Release: v0.17 October 5, 2023.
  *
  */
 
@@ -918,7 +918,7 @@ void get_metadata() {
   Serial.write('0');
   Serial.write('.');
   Serial.write('1');
-  Serial.write('6');
+  Serial.write('7');
   Serial.write((uint8_t)0x00);
 
   /* sample memory */

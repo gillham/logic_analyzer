@@ -14,6 +14,17 @@ LED pin for an input.
 On the Arduino Mega board 8 channels are supported and 7k of samples.
 Pins 22-29 (Port A) are used by default.
 
+Installation
+============
+
+You can use the GitHub 'Download ZIP' feature to get an installable "library"
+for use with the Arduino IDE.  Select 'Sketch -> Include Library -> Add .ZIP Libary'
+from the Arduino IDE 2.x and select the zip file you downloaded from GitHub, then select open.
+
+Once installed you can use the 'File -> Examples -> LogicAnalyzer' menu to find
+different versions of the sketches.  You might want to start with `logic_analyzer_sigrok`
+and use PulseView.
+
 Client Software
 ===============
 
