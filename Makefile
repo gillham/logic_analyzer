@@ -2,7 +2,7 @@
 # Makefile for an Arduino based logic analyzer using the arduino-cli
 #
 
-TARGET	= logic_analyzer
+TARGET	= examples/logic_analyzer
 FQBN	= arduino:avr:diecimila
 SERIAL	= /dev/ttyUSB*
 
