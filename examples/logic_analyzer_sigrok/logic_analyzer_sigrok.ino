@@ -881,21 +881,19 @@ void triggerMicro() {
   /*
    * trigger has fired and we have read delayCount of samples after the
    * trigger fired.  triggerIndex now points to the trigger sample
-   * logicIndex now points to the last sample taken and logicIndex + 1
-   * is where we should start dumping since it is circular.
-   *
-   * our buffer starts one entry above the last read entry.
+   * logicIndex now points after the last sample taken, and we are dumping
+   * data in reverse order. So we're pre-decrementing it
    */
-  //logicIndex++;
-
   for (i = 0 ; i < readCount; i++) {
-    if (logicIndex < 0) {
+    // logicIndex is unsigned, be careful!
+    if (logicIndex == 0)
       logicIndex = readCount - 1;
-    }
+    else
+      logicIndex--;
 #ifdef USE_PORTD
-    Serial.write(logicdata[logicIndex--] >> 2);
+    Serial.write(logicdata[logicIndex] >> 2);
 #else
-    Serial.write(logicdata[logicIndex--]);
+    Serial.write(logicdata[logicindex]);
 #endif
   }
 }
